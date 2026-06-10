@@ -1,0 +1,277 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum LeadStatus {
+  new
+  cold
+  warm
+  meeting_booked
+  not_interested
+  callback
+  no_answer
+  do_not_call
+}
+
+enum PhoneNumberStatus {
+  active
+  inactive
+}
+
+enum FollowUpStatus {
+  pending
+  completed
+  cancelled
+}
+
+enum ImportStatus {
+  processing
+  completed
+  failed
+}
+
+enum CallState {
+  initiating
+  ringing
+  in_progress
+  completed
+  failed
+  busy
+  no_answer
+  canceled
+}
+
+model User {
+  id                    String                  @id @default(cuid())
+  email                 String                  @unique
+  name                  String
+  passwordHash          String
+  role                  Role                    @default(USER)
+  disabled              Boolean                 @default(false)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  leads                 Lead[]
+  callLogs              CallLog[]
+  phoneAssignments      PhoneNumberAssignment[]
+  createdImports        ImportBatch[]
+  auditLogs             AuditLog[]              @relation("AuditActor")
+}
+
+model Lead {
+  id                   String        @id @default(cuid())
+  userId               String
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName            String?
+  lastName             String?
+  fullName             String
+  company              String?
+  companyWebsite       String?
+  jobTitle             String?
+  industry             String?
+  email                String?
+  normalizedEmail      String?       @unique
+  phone                String
+  normalizedPhone      String?       @unique
+  country              String?
+  city                 String?
+  timezone             String?
+  region               String?
+  source               String?
+  status               LeadStatus    @default(new)
+  callStatus           CallState?
+  callCount            Int           @default(0)
+  lastCalledAt         DateTime?
+  nextFollowUpAt       DateTime?
+  notes                String?
+  customFields         Json?
+  queueOrder           Int           @default(0)
+  calledInSession      Boolean       @default(false)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  callLogs             CallLog[]
+  followUps            FollowUp[]
+  importRows           ImportRowError[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([nextFollowUpAt])
+}
+
+model PhoneNumber {
+  id               String                  @id @default(cuid())
+  phoneNumber      String                  @unique
+  normalizedPhone  String                  @unique
+  label            String?
+  country          String?
+  countryCode      String?
+  signalwireSid    String?
+  status           PhoneNumberStatus       @default(active)
+  notes            String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  assignments      PhoneNumberAssignment[]
+  callLogs         CallLog[]
+}
+
+model PhoneNumberAssignment {
+  id            String      @id @default(cuid())
+  phoneNumberId String
+  phoneNumber   PhoneNumber @relation(fields: [phoneNumberId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  active        Boolean     @default(true)
+  assignedById  String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([phoneNumberId])
+}
+
+model SignalWireSetting {
+  id                         String   @id @default(cuid())
+  provider                   String   @default("signalwire")
+  projectId                  String
+  apiTokenEncrypted          String
+  spaceUrl                   String
+  sharedSubscriberReference  String?
+  sharedSubscriberPasswordEncrypted String?
+  signalwireNumber           String?
+  dialAddress                String?
+  active                     Boolean  @default(false)
+  configuredById             String?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+}
+
+model CallLog {
+  id                      String       @id @default(cuid())
+  leadId                  String?
+  lead                    Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  userId                  String
+  user                    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phoneNumberId           String?
+  phoneNumber             PhoneNumber? @relation(fields: [phoneNumberId], references: [id], onDelete: SetNull)
+  leadName                String?
+  leadCompany             String?
+  leadPhone               String?
+  dateTime                DateTime     @default(now())
+  durationSeconds         Int          @default(0)
+  outcome                 LeadStatus?
+  state                   CallState    @default(initiating)
+  notes                   String?
+  followUpTask            Boolean      @default(false)
+  followUpTaskDescription String?
+  followUpDueDate         DateTime?
+  recordingUrl            String?
+  callSid                 String?      @unique
+  calledFromNumber        String?
+  webhookEvents           SignalWireWebhookEvent[]
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
+
+  @@index([userId])
+  @@index([leadId])
+  @@index([dateTime])
+}
+
+model FollowUp {
+  id              String         @id @default(cuid())
+  leadId          String
+  lead            Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadName        String
+  leadPhone       String?
+  leadCompany     String?
+  followUpAt      DateTime
+  followUpNotes   String?
+  assignedToIds   String[]
+  createdById     String
+  status          FollowUpStatus @default(pending)
+  reminderSent    Boolean        @default(false)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([leadId])
+  @@index([followUpAt])
+}
+
+model DncEntry {
+  id              String   @id @default(cuid())
+  contactName     String
+  email           String?
+  normalizedEmail String?
+  phone           String?
+  normalizedPhone String?
+  company         String?
+  reason          String   @default("Manually Added")
+  addedById       String?
+  addedByName     String?
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  @@index([normalizedEmail])
+  @@index([normalizedPhone])
+}
+
+model ImportBatch {
+  id             String           @id @default(cuid())
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filename       String?
+  status         ImportStatus     @default(processing)
+  totalRows      Int              @default(0)
+  importedRows   Int              @default(0)
+  duplicateRows  Int              @default(0)
+  invalidRows    Int              @default(0)
+  missingRows    Int              @default(0)
+  createdAt      DateTime         @default(now())
+  completedAt    DateTime?
+  rowErrors      ImportRowError[]
+}
+
+model ImportRowError {
+  id          String      @id @default(cuid())
+  batchId     String
+  batch       ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  leadId      String?
+  lead        Lead?       @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  rowNumber   Int
+  reason      String
+  rawData     Json?
+  createdAt   DateTime    @default(now())
+
+  @@index([batchId])
+}
+
+model SignalWireWebhookEvent {
+  id          String   @id @default(cuid())
+  eventKey    String   @unique
+  callLogId   String?
+  callLog     CallLog? @relation(fields: [callLogId], references: [id], onDelete: SetNull)
+  payload     Json
+  createdAt   DateTime @default(now())
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorId     String?
+  actor       User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  action      String
+  targetType  String?
+  targetId    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+}
