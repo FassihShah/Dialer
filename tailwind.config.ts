@@ -11,9 +11,11 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        navy: '#0F172A',
+        navy: '#0E1626',
+        canvas: '#F6F8FC',
         'electric-blue': '#2563EB',
-        'slate-gray': '#64748B',
+        'accent-indigo': '#4F46E5',
+        'slate-gray': '#5C6B83',
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
@@ -29,11 +31,10 @@ const config: Config = {
       },
       borderRadius: { lg: 'var(--radius)', md: 'calc(var(--radius) - 2px)', sm: 'calc(var(--radius) - 4px)', xl: '0.875rem', '2xl': '1.125rem' },
       fontFamily: {
-        sans: ['var(--font-sans)', 'system-ui', '-apple-system', 'sans-serif'],
-        // Existing components use `font-dm` (body) and `font-bricolage` (headings).
-        // Both now resolve to Inter for a clean, professional, premium look.
-        dm: ['var(--font-sans)', 'system-ui', 'sans-serif'],
-        bricolage: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+        // Trueno across the whole app; Inter (next/font) is the fallback if the CDN fails.
+        sans: ['Trueno', 'var(--font-sans)', 'system-ui', '-apple-system', 'sans-serif'],
+        dm: ['Trueno', 'var(--font-sans)', 'system-ui', 'sans-serif'],
+        bricolage: ['Trueno', 'var(--font-sans)', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       boxShadow: {

@@ -1,3 +1,7 @@
+/* Trueno — professional geometric sans, used across the whole app.
+   Inter (loaded via next/font in layout.tsx) is the fallback if this CDN is unreachable. */
+@import url('https://fonts.cdnfonts.com/css/trueno');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -35,10 +39,8 @@
   }
 
   body {
-    @apply font-sans text-navy bg-slate-50;
-    /* Inter optical tweaks for a refined, premium read */
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'ss01';
-    letter-spacing: -0.011em;
+    @apply font-sans text-navy bg-canvas;
+    letter-spacing: -0.006em;
   }
 
   /* Tight, confident headings — the premium SaaS look */
