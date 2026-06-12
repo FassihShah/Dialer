@@ -1,14 +1,16 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { PhoneCall, Clock, Calendar, LogOut } from 'lucide-react';
+import { PhoneCall, Clock, Calendar, LogOut, Users, Phone } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
 import { cn, nameInitials, nameColor } from '@/lib/utils';
 
 const NAV = [
   { href: '/dialer', icon: PhoneCall, label: 'Dialer' },
+  { href: '/dialer/crm', icon: Users, label: 'CRM — Leads' },
   { href: '/dialer/history', icon: Clock, label: 'Call History' },
   { href: '/dialer/follow-ups', icon: Calendar, label: 'Follow-ups' },
+  { href: '/dialer/my-number', icon: Phone, label: 'My Number' },
 ];
 
 export default function DialerNav() {

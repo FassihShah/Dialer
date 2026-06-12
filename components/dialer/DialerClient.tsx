@@ -73,18 +73,9 @@ export default function DialerClient() {
     refetchInterval: 30_000,
   });
 
-  const { data: voipConfig } = useQuery({
-    queryKey: ['voip_config_user'],
-    queryFn: async () => {
-      const r = await fetch('/api/admin/settings');
-      if (!r.ok) return null;
-      return r.json();
-    },
-  });
-
   // ── Initialize SignalWire Browser SDK ───────────────────────────────────────
   useEffect(() => {
-    if (!session?.user || !voipConfig) return;
+    if (!session?.user) return;
     if (swClientRef.current || deviceStatus !== 'idle') return;
 
     setDeviceStatus('initializing');
@@ -121,7 +112,7 @@ export default function DialerClient() {
         setDeviceStatus('error');
       }
     })();
-  }, [session, voipConfig]);
+  }, [session, deviceStatus]);
 
   useEffect(() => {
     return () => {
