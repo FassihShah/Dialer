@@ -7,9 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  ADMIN
-  USER
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  admin
+  user
+}
+
+enum UserStatus {
+  active
+  suspended
+  pending
 }
 
 enum LeadStatus {
@@ -19,13 +27,29 @@ enum LeadStatus {
   meeting_booked
   not_interested
   callback
+  do_not_call
+}
+
+enum CallOutcome {
+  cold
+  warm
+  meeting_booked
+  not_interested
+  callback
   no_answer
   do_not_call
 }
 
-enum PhoneNumberStatus {
+enum NumberStatus {
   active
   inactive
+}
+
+enum DNCReason {
+  DNC_Requested
+  Unsubscribed
+  Manually_Added
+  Other
 }
 
 enum FollowUpStatus {
@@ -40,238 +64,217 @@ enum ImportStatus {
   failed
 }
 
-enum CallState {
-  initiating
-  ringing
-  in_progress
-  completed
-  failed
-  busy
-  no_answer
-  canceled
-}
+// ─── Models ──────────────────────────────────────────────────────────────────
 
 model User {
-  id                    String                  @id @default(cuid())
-  email                 String                  @unique
-  name                  String
-  passwordHash          String
-  role                  Role                    @default(USER)
-  disabled              Boolean                 @default(false)
-  createdAt             DateTime                @default(now())
-  updatedAt             DateTime                @updatedAt
-  leads                 Lead[]
-  callLogs              CallLog[]
-  phoneAssignments      PhoneNumberAssignment[]
-  createdImports        ImportBatch[]
-  auditLogs             AuditLog[]              @relation("AuditActor")
+  id                   String        @id @default(cuid())
+  email                String        @unique
+  name                 String
+  password             String
+  role                 UserRole      @default(user)
+  status               UserStatus    @default(pending)
+  agentPhone           String?       @map("agent_phone")
+  subscriberReference  String?       @map("subscriber_reference")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+  createdById          String?       @map("created_by_id")
+
+  leads                Lead[]
+  callLogs             CallLog[]
+  followUps            FollowUp[]
+  phoneAssignment      PhoneNumberAssignment?
+  importBatches        ImportBatch[]
+  auditLogs            AuditLog[]
+
+  @@map("users")
 }
 
 model Lead {
-  id                   String        @id @default(cuid())
-  userId               String
-  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  firstName            String?
-  lastName             String?
-  fullName             String
-  company              String?
-  companyWebsite       String?
-  jobTitle             String?
-  industry             String?
-  email                String?
-  normalizedEmail      String?       @unique
-  phone                String
-  normalizedPhone      String?       @unique
-  country              String?
-  city                 String?
-  timezone             String?
-  region               String?
-  source               String?
-  status               LeadStatus    @default(new)
-  callStatus           CallState?
-  callCount            Int           @default(0)
-  lastCalledAt         DateTime?
-  nextFollowUpAt       DateTime?
-  notes                String?
-  customFields         Json?
-  queueOrder           Int           @default(0)
-  calledInSession      Boolean       @default(false)
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
-  callLogs             CallLog[]
-  followUps            FollowUp[]
-  importRows           ImportRowError[]
+  id                 String      @id @default(cuid())
+  userId             String      @map("user_id")
+  user               User        @relation(fields: [userId], references: [id])
+
+  fullName           String      @map("full_name")
+  companyName        String?     @map("company_name")
+  companyWebsite     String?     @map("company_website")
+  phone              String
+  normalizedPhone    String?     @map("normalized_phone")
+  email              String?
+  normalizedEmail    String?     @map("normalized_email")
+  jobTitle           String?     @map("job_title")
+  industry           String?
+  region             String?
+  notes              String?     @db.Text
+  status             LeadStatus  @default(new)
+  callCount          Int         @default(0) @map("call_count")
+  lastCalledAt       DateTime?   @map("last_called_at")
+  followUpDate       DateTime?   @map("follow_up_date")
+  followUpNotes      String?     @map("follow_up_notes") @db.Text
+  calledInSession    Boolean     @default(false) @map("called_in_session")
+  queueOrder         Int         @default(0) @map("queue_order")
+  source             String?
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
+
+  callLogs           CallLog[]
+  followUps          FollowUp[]
 
   @@index([userId])
-  @@index([status])
-  @@index([nextFollowUpAt])
+  @@index([normalizedPhone])
+  @@index([normalizedEmail])
+  @@map("leads")
 }
 
+// Global dedup indexes — PostgreSQL partial unique indexes are defined via migration
+// normalizedPhone: unique where normalizedPhone IS NOT NULL
+// normalizedEmail: unique where normalizedEmail IS NOT NULL
+
 model PhoneNumber {
-  id               String                  @id @default(cuid())
-  phoneNumber      String                  @unique
-  normalizedPhone  String                  @unique
-  label            String?
-  country          String?
-  countryCode      String?
-  signalwireSid    String?
-  status           PhoneNumberStatus       @default(active)
-  notes            String?
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
-  assignments      PhoneNumberAssignment[]
-  callLogs         CallLog[]
+  id             String      @id @default(cuid())
+  phoneNumber    String      @unique @map("phone_number")
+  label          String?
+  country        String?
+  countryCode    String?     @map("country_code")
+  signalwireSid  String?     @map("signalwire_sid")
+  status         NumberStatus @default(active)
+  notes          String?
+  addedById      String?     @map("added_by_id")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  assignment     PhoneNumberAssignment?
+  callLogs       CallLog[]
+
+  @@map("phone_numbers")
 }
 
 model PhoneNumberAssignment {
-  id            String      @id @default(cuid())
-  phoneNumberId String
-  phoneNumber   PhoneNumber @relation(fields: [phoneNumberId], references: [id], onDelete: Cascade)
-  userId        String
-  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  active        Boolean     @default(true)
-  assignedById  String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id             String      @id @default(cuid())
+  userId         String      @unique @map("user_id")
+  user           User        @relation(fields: [userId], references: [id])
+  phoneNumberId  String      @unique @map("phone_number_id")
+  phoneNumber    PhoneNumber @relation(fields: [phoneNumberId], references: [id])
+  assignedById   String?     @map("assigned_by_id")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
 
   @@index([userId])
   @@index([phoneNumberId])
-}
-
-model SignalWireSetting {
-  id                         String   @id @default(cuid())
-  provider                   String   @default("signalwire")
-  projectId                  String
-  apiTokenEncrypted          String
-  spaceUrl                   String
-  sharedSubscriberReference  String?
-  sharedSubscriberPasswordEncrypted String?
-  signalwireNumber           String?
-  dialAddress                String?
-  active                     Boolean  @default(false)
-  configuredById             String?
-  createdAt                  DateTime @default(now())
-  updatedAt                  DateTime @updatedAt
+  @@map("phone_number_assignments")
 }
 
 model CallLog {
-  id                      String       @id @default(cuid())
-  leadId                  String?
-  lead                    Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  userId                  String
-  user                    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  phoneNumberId           String?
-  phoneNumber             PhoneNumber? @relation(fields: [phoneNumberId], references: [id], onDelete: SetNull)
-  leadName                String?
-  leadCompany             String?
-  leadPhone               String?
-  dateTime                DateTime     @default(now())
-  durationSeconds         Int          @default(0)
-  outcome                 LeadStatus?
-  state                   CallState    @default(initiating)
-  notes                   String?
-  followUpTask            Boolean      @default(false)
-  followUpTaskDescription String?
-  followUpDueDate         DateTime?
-  recordingUrl            String?
-  callSid                 String?      @unique
-  calledFromNumber        String?
-  webhookEvents           SignalWireWebhookEvent[]
-  createdAt               DateTime     @default(now())
-  updatedAt               DateTime     @updatedAt
+  id               String       @id @default(cuid())
+  userId           String       @map("user_id")
+  user             User         @relation(fields: [userId], references: [id])
+  leadId           String?      @map("lead_id")
+  lead             Lead?        @relation(fields: [leadId], references: [id])
+  leadName         String?      @map("lead_name")
+  leadCompany      String?      @map("lead_company")
+  calledFromId     String?      @map("called_from_id")
+  calledFrom       PhoneNumber? @relation(fields: [calledFromId], references: [id])
+  calledFromNumber String?      @map("called_from_number")
+  callSid          String?      @map("call_sid")
+  dateTime         DateTime     @default(now()) @map("date_time")
+  durationSeconds  Int          @default(0) @map("duration_seconds")
+  outcome          CallOutcome?
+  notes            String?      @db.Text
+  recordingUrl     String?      @map("recording_url")
+  followUpCreated  Boolean      @default(false) @map("follow_up_created")
+  followUpDate     DateTime?    @map("follow_up_date")
+  followUpNotes    String?      @map("follow_up_notes") @db.Text
+  createdAt        DateTime     @default(now()) @map("created_at")
 
   @@index([userId])
   @@index([leadId])
-  @@index([dateTime])
+  @@index([callSid])
+  @@map("call_logs")
 }
 
 model FollowUp {
   id              String         @id @default(cuid())
-  leadId          String
-  lead            Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  leadName        String
-  leadPhone       String?
-  leadCompany     String?
-  followUpAt      DateTime
-  followUpNotes   String?
-  assignedToIds   String[]
-  createdById     String
+  leadId          String         @map("lead_id")
+  lead            Lead           @relation(fields: [leadId], references: [id])
+  userId          String         @map("user_id")
+  user            User           @relation(fields: [userId], references: [id])
+  followUpDate    DateTime       @map("follow_up_date")
+  followUpTime    String?        @map("follow_up_time")
+  followUpNotes   String?        @map("follow_up_notes") @db.Text
   status          FollowUpStatus @default(pending)
-  reminderSent    Boolean        @default(false)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  reminderSent    Boolean        @default(false) @map("reminder_sent")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
 
+  @@index([userId])
   @@index([leadId])
-  @@index([followUpAt])
+  @@map("follow_ups")
 }
 
-model DncEntry {
-  id              String   @id @default(cuid())
-  contactName     String
-  email           String?
-  normalizedEmail String?
-  phone           String?
-  normalizedPhone String?
-  company         String?
-  reason          String   @default("Manually Added")
-  addedById       String?
-  addedByName     String?
-  notes           String?
-  createdAt       DateTime @default(now())
+model DNCEntry {
+  id            String    @id @default(cuid())
+  contactName   String?   @map("contact_name")
+  email         String?
+  normalizedEmail String? @map("normalized_email")
+  phone         String?
+  normalizedPhone String? @map("normalized_phone")
+  company       String?
+  reason        DNCReason @default(Manually_Added)
+  addedById     String?   @map("added_by_id")
+  addedByName   String?   @map("added_by_name")
+  notes         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
 
-  @@index([normalizedEmail])
   @@index([normalizedPhone])
+  @@index([normalizedEmail])
+  @@map("dnc_entries")
+}
+
+model VoIPConfig {
+  id                         String   @id @default(cuid())
+  provider                   String   @default("signalwire")
+  projectId                  String   @map("project_id")
+  apiToken                   String   @map("api_token")
+  spaceUrl                   String   @map("space_url")
+  sharedSubscriberReference  String?  @map("shared_subscriber_reference")
+  sharedSubscriberPassword   String?  @map("shared_subscriber_password")
+  signalwireNumber           String?  @map("signalwire_number")
+  dialAddress                String?  @map("dial_address")
+  active                     Boolean  @default(false)
+  configuredById             String?  @map("configured_by_id")
+  createdAt                  DateTime @default(now()) @map("created_at")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+
+  @@map("voip_configs")
 }
 
 model ImportBatch {
-  id             String           @id @default(cuid())
-  userId         String
-  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  filename       String?
-  status         ImportStatus     @default(processing)
-  totalRows      Int              @default(0)
-  importedRows   Int              @default(0)
-  duplicateRows  Int              @default(0)
-  invalidRows    Int              @default(0)
-  missingRows    Int              @default(0)
-  createdAt      DateTime         @default(now())
-  completedAt    DateTime?
-  rowErrors      ImportRowError[]
-}
+  id              String       @id @default(cuid())
+  userId          String       @map("user_id")
+  user            User         @relation(fields: [userId], references: [id])
+  fileName        String?      @map("file_name")
+  totalRows       Int          @default(0) @map("total_rows")
+  importedRows    Int          @default(0) @map("imported_rows")
+  duplicateRows   Int          @default(0) @map("duplicate_rows")
+  invalidRows     Int          @default(0) @map("invalid_rows")
+  status          ImportStatus @default(processing)
+  errors          Json?
+  createdAt       DateTime     @default(now()) @map("created_at")
 
-model ImportRowError {
-  id          String      @id @default(cuid())
-  batchId     String
-  batch       ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  leadId      String?
-  lead        Lead?       @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  rowNumber   Int
-  reason      String
-  rawData     Json?
-  createdAt   DateTime    @default(now())
-
-  @@index([batchId])
-}
-
-model SignalWireWebhookEvent {
-  id          String   @id @default(cuid())
-  eventKey    String   @unique
-  callLogId   String?
-  callLog     CallLog? @relation(fields: [callLogId], references: [id], onDelete: SetNull)
-  payload     Json
-  createdAt   DateTime @default(now())
+  @@index([userId])
+  @@map("import_batches")
 }
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  actorId     String?
-  actor       User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
-  action      String
-  targetType  String?
-  targetId    String?
-  metadata    Json?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String?  @map("user_id")
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  entityType String?  @map("entity_type")
+  entityId   String?  @map("entity_id")
+  details    Json?
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
 
-  @@index([actorId])
-  @@index([action])
+  @@index([userId])
+  @@map("audit_logs")
 }
