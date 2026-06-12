@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, Phone, Settings, LogOut, PhoneCall } from 'lucide-react';
+import { LayoutDashboard, Users, Phone, Settings, LogOut, PhoneCall, Activity } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
 import { cn, nameInitials, nameColor } from '@/lib/utils';
 
@@ -9,6 +9,7 @@ const NAV = [
   { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/admin/users', icon: Users, label: 'Users' },
   { href: '/admin/numbers', icon: Phone, label: 'Phone Numbers' },
+  { href: '/admin/status', icon: Activity, label: 'Live Status' },
   { href: '/admin/settings', icon: Settings, label: 'Dialer Settings' },
 ];
 

@@ -61,8 +61,9 @@ export default function DialerClient() {
   const callTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const callSidRef = useRef<string | null>(null);
   const swClientRef = useRef<unknown>(null);
-  const activeCallRef = useRef<{ hangup: () => void; on: (e: string, cb: (s: unknown) => void) => void; start: () => Promise<void>; id?: string } | null>(null);
+  const activeCallRef = useRef<{ hangup: () => Promise<void>; on: (e: string, cb: (s: unknown) => void) => void; start: () => Promise<void>; id?: string } | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const rootElementRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => { callSidRef.current = callSid; }, [callSid]);
 
@@ -158,52 +159,65 @@ export default function DialerClient() {
     setCallSid(null);
     setCallDialogOpen(true);
 
-    const params = new URLSearchParams({
+    // Fabric SDK: pass call data via userVariables (delivered to the SWML script).
+    // Dial the bare resource address — query strings can break Fabric address resolution.
+    const userVariables = {
       lead_phone: e164,
       lead_name: lead.fullName || '',
       lead_company: lead.companyName || '',
       dialer_lead_id: lead.id || '',
       user_id: session?.user.id || '',
-    });
-    const dialTo = `${dialAddress}?${params}`;
+      caller_id: session?.user.id || '',
+    };
 
     try {
       const call = await (swClientRef.current as { dial: (opts: object) => Promise<typeof activeCallRef.current> }).dial({
-        to: dialTo, audio: true, video: false,
-        userVariables: {
-          lead_phone: e164, lead_name: lead.fullName, lead_company: lead.companyName || '',
-          dialer_lead_id: lead.id, user_id: session?.user.id || '', caller_id: session?.user.id || '',
-        },
+        to: dialAddress,
+        audio: true,
+        video: false,
+        negotiateVideo: false,
+        rootElement: rootElementRef.current, // SDK auto-attaches remote audio here
+        userVariables,
       });
 
       activeCallRef.current = call;
 
+      // Fallback manual audio attach (in case rootElement isn't used by SDK version)
       call?.on('track', (event: unknown) => {
-        const e = event as { streams?: MediaStream[] };
+        const e = event as RTCTrackEvent;
         if (remoteAudioRef.current && e.streams?.[0]) {
           remoteAudioRef.current.srcObject = e.streams[0];
           remoteAudioRef.current.play().catch(() => {});
         }
       });
 
-      call?.on('state', (state: unknown) => {
-        const raw = typeof state === 'object' && state !== null ? ((state as { name?: string }).name ?? '') : String(state);
-        const s = raw.toLowerCase();
-        if (s === 'created' || s === 'ringing') setCallStatus('ringing');
-        else if (s === 'answered' || s === 'active') {
-          setCallStatus('connected');
-          const startTime = Date.now();
-          setCallStartTime(startTime);
-          clearCallTimer();
-          callTimerRef.current = setInterval(() => setCallDuration(Math.floor((Date.now() - startTime) / 1000)), 1000);
-        } else if (s === 'ended' || s === 'destroy' || s === 'hangup') handleCallEnded();
-        else if (s === 'failed') { showError('Call failed. Check SignalWire configuration.'); handleCallEnded(); }
+      // Authoritative call lifecycle event in the Fabric SDK: `call.state`
+      // call_state ∈ created | ringing | answered | ending | ended
+      call?.on('call.state', (evt: unknown) => {
+        const p = evt as { call_state?: string; call_id?: string };
+        if (p.call_id) { setCallSid(p.call_id); callSidRef.current = p.call_id; }
+        switch (p.call_state) {
+          case 'created':
+          case 'ringing':
+            setCallStatus('ringing');
+            break;
+          case 'answered': {
+            setCallStatus('connected');
+            const startTime = Date.now();
+            setCallStartTime(startTime);
+            clearCallTimer();
+            callTimerRef.current = setInterval(() => setCallDuration(Math.floor((Date.now() - startTime) / 1000)), 1000);
+            break;
+          }
+          case 'ending':
+          case 'ended':
+            handleCallEnded();
+            break;
+        }
       });
 
-      call?.on('call.updated', (evt: unknown) => {
-        const e = evt as { id?: string };
-        if (e?.id) { setCallSid(e.id); callSidRef.current = e.id; }
-      });
+      // The room/connection ending — ensures cleanup even if call.state is missed.
+      call?.on('call.left', () => handleCallEnded());
 
       await call?.start();
       if (call?.id) { setCallSid(call.id); callSidRef.current = call.id; }
@@ -219,7 +233,7 @@ export default function DialerClient() {
   const handleHangup = async () => {
     clearCallTimer();
     const sid = callSidRef.current;
-    if (activeCallRef.current) { try { activeCallRef.current.hangup(); } catch {} activeCallRef.current = null; }
+    if (activeCallRef.current) { try { await activeCallRef.current.hangup(); } catch {} activeCallRef.current = null; }
     if (sid) {
       await fetch('/api/calls/end', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ callId: sid, durationSeconds: callDuration }) }).catch(() => {});
     }
@@ -346,6 +360,7 @@ export default function DialerClient() {
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh)' }}>
       <audio ref={remoteAudioRef} autoPlay style={{ display: 'none' }} />
+      <div ref={rootElementRef} style={{ display: 'none' }} />
 
       {deviceStatus === 'mic_denied' && (
         <div className="flex items-center gap-3 px-4 py-3 bg-red-50 border-b border-red-200 flex-shrink-0">

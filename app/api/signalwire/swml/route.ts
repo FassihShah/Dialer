@@ -16,9 +16,25 @@ export async function POST(req: NextRequest) {
       body = JSON.parse(text);
     } catch { /* form-encoded or empty */ }
 
-    const vars = (body as { call?: { variables?: Record<string, string> }; vars?: Record<string, string>; userVariables?: Record<string, string> })?.call?.variables ||
-      (body as { vars?: Record<string, string> })?.vars ||
-      (body as { userVariables?: Record<string, string> })?.userVariables || body as Record<string, string> || {};
+    // SignalWire delivers SDK userVariables to the SWML webhook under `vars`.
+    // Check every known shape defensively so call data is never lost.
+    const b = body as {
+      call?: { variables?: Record<string, string>; user_variables?: Record<string, string> };
+      vars?: Record<string, string>;
+      userVariables?: Record<string, string>;
+      params?: { vars?: Record<string, string>; userVariables?: Record<string, string> };
+    };
+    const vars: Record<string, string> = {
+      ...(body as Record<string, string>),
+      ...(b?.params?.vars || {}),
+      ...(b?.params?.userVariables || {}),
+      ...(b?.call?.variables || {}),
+      ...(b?.call?.user_variables || {}),
+      ...(b?.userVariables || {}),
+      ...(b?.vars || {}),
+    };
+
+    console.log('[SWML] incoming body keys:', Object.keys(body), '| resolved vars:', Object.keys(vars));
 
     const rawLeadPhone = qp.get('lead_phone') || (vars as Record<string, string>).lead_phone || null;
     const callerId     = qp.get('user_id')    || (vars as Record<string, string>).user_id    || null;

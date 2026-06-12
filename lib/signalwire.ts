@@ -84,6 +84,21 @@ export async function fetchNumbers(config: SWConfig) {
   return { success: true, numbers };
 }
 
+/** Verify API credentials by fetching the account record. */
+export async function fetchAccount(config: SWConfig) {
+  const url = `https://${config.cleanSpaceUrl}/api/laml/2010-04-01/Accounts/${config.projectId}.json`;
+  try {
+    const res = await fetch(url, { headers: { Authorization: basicAuth(config), Accept: 'application/json' } });
+    const text = await res.text();
+    let data: Record<string, unknown>;
+    try { data = JSON.parse(text); } catch { return { ok: false, error: `Parse error. HTTP ${res.status}` }; }
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${(data.message || data.detail || '') as string}` };
+    return { ok: true, friendlyName: (data.friendly_name as string) || null, status: (data.status as string) || null };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
 /** End an active call via SignalWire Calling API */
 export async function endCall(config: SWConfig, callId: string) {
   const url = `https://${config.cleanSpaceUrl}/api/calling/calls`;
