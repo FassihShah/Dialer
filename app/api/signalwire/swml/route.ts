@@ -16,22 +16,25 @@ export async function POST(req: NextRequest) {
       body = JSON.parse(text);
     } catch { /* form-encoded or empty */ }
 
-    // SignalWire delivers SDK userVariables to the SWML webhook under `vars`.
-    // Check every known shape defensively so call data is never lost.
+    // Per SignalWire docs, the SWML webhook body is { call, params, vars, envs }.
+    // userVariables passed to the browser SDK's dial() arrive in the `params` scope.
+    // Merge every known shape defensively so call data is never lost.
     const b = body as {
-      call?: { variables?: Record<string, string>; user_variables?: Record<string, string> };
+      call?: { variables?: Record<string, string>; user_variables?: Record<string, string>; params?: Record<string, string>; call_id?: string };
+      params?: Record<string, unknown>;
       vars?: Record<string, string>;
       userVariables?: Record<string, string>;
-      params?: { vars?: Record<string, string>; userVariables?: Record<string, string> };
     };
+    const params = (b?.params || {}) as Record<string, string>;
+    const callId = b?.call?.call_id || params.call_id || null;
     const vars: Record<string, string> = {
       ...(body as Record<string, string>),
-      ...(b?.params?.vars || {}),
-      ...(b?.params?.userVariables || {}),
       ...(b?.call?.variables || {}),
       ...(b?.call?.user_variables || {}),
+      ...(b?.call?.params || {}),
       ...(b?.userVariables || {}),
       ...(b?.vars || {}),
+      ...params, // SDK userVariables land here — highest priority
     };
 
     console.log('[SWML] incoming body keys:', Object.keys(body), '| resolved vars:', Object.keys(vars));
@@ -85,7 +88,7 @@ export async function POST(req: NextRequest) {
           leadName: leadName || null,
           leadCompany: leadCompany || null,
           calledFromNumber: fromNumber,
-          callSid: (vars as Record<string, string>).call_id || null,
+          callSid: callId,
           dateTime: new Date(),
           durationSeconds: 0,
         },
