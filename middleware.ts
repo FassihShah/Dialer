@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export function middleware(req: NextRequest) {
-  // NextAuth v5 uses "authjs.*" cookie names (v4 used "next-auth.*").
-  // Check both to be safe across versions / dev vs prod (secure prefix).
-  const sessionToken =
-    req.cookies.get('authjs.session-token') ||
-    req.cookies.get('__Secure-authjs.session-token') ||
-    req.cookies.get('next-auth.session-token') ||
-    req.cookies.get('__Secure-next-auth.session-token');
+  // Match any NextAuth session cookie regardless of version/prefix:
+  // v5: authjs.session-token / __Secure-authjs.session-token
+  // v4: next-auth.session-token / __Secure-next-auth.session-token
+  // Also handles chunked cookies (e.g. authjs.session-token.0)
+  const hasSession = req.cookies
+    .getAll()
+    .some((c) => c.name.includes('session-token') && c.value.length > 0);
 
-  if (!sessionToken) {
+  if (!hasSession) {
     return NextResponse.redirect(new URL('/login', req.url));
   }
 
@@ -17,5 +17,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api/signalwire/webhook|api/signalwire/swml|api/auth/register|_next/static|_next/image|favicon.ico|login|register|pending).*)'],
+  matcher: ['/((?!api/auth|api/signalwire/webhook|api/signalwire/swml|_next/static|_next/image|favicon.ico|login|register|pending).*)'],
 };
