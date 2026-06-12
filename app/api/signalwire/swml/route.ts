@@ -16,28 +16,37 @@ export async function POST(req: NextRequest) {
       body = JSON.parse(text);
     } catch { /* form-encoded or empty */ }
 
-    // Per SignalWire docs, the SWML webhook body is { call, params, vars, envs }.
-    // userVariables passed to the browser SDK's dial() arrive in the `params` scope.
-    // Merge every known shape defensively so call data is never lost.
-    const b = body as {
-      call?: { variables?: Record<string, string>; user_variables?: Record<string, string>; params?: Record<string, string>; call_id?: string };
-      params?: Record<string, unknown>;
-      vars?: Record<string, string>;
-      userVariables?: Record<string, string>;
-    };
-    const params = (b?.params || {}) as Record<string, string>;
-    const callId = b?.call?.call_id || params.call_id || null;
-    const vars: Record<string, string> = {
-      ...(body as Record<string, string>),
-      ...(b?.call?.variables || {}),
-      ...(b?.call?.user_variables || {}),
-      ...(b?.call?.params || {}),
-      ...(b?.userVariables || {}),
-      ...(b?.vars || {}),
-      ...params, // SDK userVariables land here — highest priority
-    };
+    // The SWML webhook body shape (confirmed from logs) is { call, vars }.
+    // SDK userVariables land nested at body.vars.userVariables. Merge every
+    // candidate object so call data is found no matter the nesting.
+    const b = body as Record<string, unknown>;
+    const obj = (v: unknown): Record<string, string> =>
+      (v && typeof v === 'object') ? (v as Record<string, string>) : {};
+    const callObj = obj(b.call);
+    const varsObj = obj(b.vars);
+    const paramsObj = obj(b.params);
 
-    console.log('[SWML] incoming body keys:', Object.keys(body), '| resolved vars:', Object.keys(vars));
+    const vars: Record<string, string> = {};
+    // Order matters — later spreads win. Most specific (userVariables) last.
+    Object.assign(
+      vars,
+      obj(b),                       // top-level
+      callObj,                      // call.*
+      obj(callObj.variables),       // call.variables
+      obj(callObj.user_variables),  // call.user_variables
+      paramsObj,                    // params.*
+      obj(paramsObj.userVariables), // params.userVariables
+      varsObj,                      // vars.*
+      obj(b.userVariables),         // body.userVariables
+      obj(callObj.userVariables),   // call.userVariables
+      obj(varsObj.userVariables),   // vars.userVariables  ← actual location
+    );
+
+    const callId = (callObj.call_id as string) || vars.call_id || null;
+
+    console.log('[SWML] body keys:', Object.keys(body),
+      '| vars.userVariables keys:', Object.keys(obj(varsObj.userVariables)),
+      '| resolved lead_phone:', vars.lead_phone || '(none)');
 
     const rawLeadPhone = qp.get('lead_phone') || (vars as Record<string, string>).lead_phone || null;
     const callerId     = qp.get('user_id')    || (vars as Record<string, string>).user_id    || null;
