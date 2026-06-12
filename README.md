@@ -6,7 +6,7 @@ A cold calling CRM & dialer platform built with Next.js 15, SignalWire, and Deep
 
 - Browser-based calling via SignalWire Fabric
 - Lead management with bulk import & deduplication
-- AI-generated sales pitches (DeepSeek)
+- AI-generated sales pitches 
 - Auto-dialer with queue management
 - Follow-up scheduling
 - DNC (Do Not Call) list
