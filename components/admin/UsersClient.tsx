@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, UserX, Check, X, Phone, UserCheck, Clock } from 'lucide-react';
+import Link from 'next/link';
+import { Plus, Pencil, UserX, Check, X, Phone, UserCheck, Clock, BarChart3 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { cn, nameColor, nameInitials } from '@/lib/utils';
 
@@ -170,6 +171,10 @@ export default function UsersClient() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
+                    <Link href={`/admin/reports/${u.id}`} title="View stats & reports"
+                      className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-electric-blue transition-colors">
+                      <BarChart3 size={13} />
+                    </Link>
                     <button onClick={() => setEditing(u)} title="Edit"
                       className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-navy transition-colors">
                       <Pencil size={13} />

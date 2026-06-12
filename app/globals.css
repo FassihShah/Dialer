@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Bricolage+Grotesque:wght@400;500;600;700;800&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -25,20 +23,84 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --radius: 0.625rem;
   }
+
   * { box-sizing: border-box; }
-  body { @apply font-dm text-navy antialiased bg-slate-50; }
-  h1, h2, h3 { @apply font-bricolage; }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply font-sans text-navy bg-slate-50;
+    /* Inter optical tweaks for a refined, premium read */
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'ss01';
+    letter-spacing: -0.011em;
+  }
+
+  /* Tight, confident headings — the premium SaaS look */
+  h1, h2, h3, h4 {
+    @apply font-sans font-semibold;
+    letter-spacing: -0.021em;
+  }
+
+  /* Subtle, consistent motion on interactive elements */
+  a, button {
+    transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease,
+      box-shadow 0.16s ease, opacity 0.16s ease, transform 0.16s ease;
+  }
+  input, select, textarea {
+    transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+  }
+
+  /* Refined, minimal scrollbars */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; background-clip: content-box; }
+  * { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+
+  ::selection { background: rgba(37, 99, 235, 0.16); }
+
+  /* Dark scrollbars inside the navy sidebars */
+  .scrollbar-dark::-webkit-scrollbar-thumb { background: #334155; background-clip: content-box; }
+}
+
+@layer components {
+  /* Optional premium primitives for new/updated surfaces */
+  .card-premium {
+    @apply bg-white rounded-2xl border border-slate-200/80 shadow-premium;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-electric-blue text-white
+      text-sm font-medium shadow-sm hover:bg-blue-700 hover:shadow-premium active:scale-[0.98]
+      disabled:opacity-60 disabled:pointer-events-none transition-all;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200
+      text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] transition-all;
+  }
+  .input-premium {
+    @apply w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm
+      focus:outline-none focus:border-electric-blue focus:ring-4 focus:ring-electric-blue/10 transition-all;
+  }
 }
 
 @layer utilities {
   .skeleton {
-    @apply bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite];
+    @apply bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 bg-[length:200%_100%] animate-shimmer;
   }
-}
-
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  .glass {
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
 }

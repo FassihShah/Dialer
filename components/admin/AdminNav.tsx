@@ -1,12 +1,13 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, Phone, Settings, LogOut, PhoneCall, Activity } from 'lucide-react';
+import { LayoutDashboard, Users, Phone, Settings, LogOut, PhoneCall, Activity, BarChart3 } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
 import { cn, nameInitials, nameColor } from '@/lib/utils';
 
 const NAV = [
   { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/admin/reports', icon: BarChart3, label: 'Reports' },
   { href: '/admin/users', icon: Users, label: 'Users' },
   { href: '/admin/numbers', icon: Phone, label: 'Phone Numbers' },
   { href: '/admin/status', icon: Activity, label: 'Live Status' },
@@ -18,7 +19,7 @@ export default function AdminNav() {
   const { data: session } = useSession();
 
   return (
-    <nav className="w-56 flex flex-col bg-navy border-r border-slate-800 h-full">
+    <nav className="w-56 flex flex-col bg-gradient-to-b from-navy to-slate-900 border-r border-slate-800/60 h-full">
       <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-800">
         <div className="w-8 h-8 bg-electric-blue rounded-lg flex items-center justify-center flex-shrink-0">
           <PhoneCall size={15} className="text-white" />
@@ -34,8 +35,8 @@ export default function AdminNav() {
           const active = pathname.startsWith(n.href);
           return (
             <Link key={n.href} href={n.href}
-              className={cn('flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-dm transition-all',
-                active ? 'bg-electric-blue text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-700')}>
+              className={cn('flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-dm transition-all active:scale-[0.98]',
+                active ? 'bg-electric-blue text-white shadow-lg shadow-blue-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-700/70')}>
               <n.icon size={16} />
               {n.label}
             </Link>

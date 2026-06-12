@@ -299,6 +299,25 @@ export default function DialerClient() {
     }
   };
 
+  // Auto-dialer: dial the first lead in the queue right away on Start.
+  const handleAutoStart = () => {
+    setAutoRunning(true);
+    setAutoPaused(false);
+    setSessionComplete(false);
+    const next = leads.find((l) => !l.calledInSession && l.status !== 'do_not_call');
+    if (next) initiateCall(next);
+    else { setSessionComplete(true); setAutoRunning(false); }
+  };
+
+  // Resume: if no call is currently active, pick up the next lead immediately.
+  const handleAutoResume = () => {
+    setAutoPaused(false);
+    if (!['initiating', 'ringing', 'connected'].includes(callStatus)) {
+      const next = leads.find((l) => !l.calledInSession && l.status !== 'do_not_call');
+      if (next) initiateCall(next);
+    }
+  };
+
   const handleLeadCall = (lead: Lead) => {
     if (mode === 'Manual') { setSelectedLead(lead); setDialNumber(lead.phone); }
     else initiateCall(lead);
@@ -418,11 +437,21 @@ export default function DialerClient() {
 
           <div className="flex-1 overflow-y-auto">
             {areaTab === 'Call' && mode === 'Auto' && (
-              <AutoDialer leads={leads} onCall={(l) => initiateCall(l)} onSkip={(l) => l && updateLeadMutation.mutate({ id: l.id, data: { calledInSession: true } })}
+              <AutoDialer leads={leads} onCall={(l) => initiateCall(l)}
+                onSkip={async (l) => {
+                  if (!l) return;
+                  await updateLeadMutation.mutateAsync({ id: l.id, data: { calledInSession: true } });
+                  // If a session is running, advance to the next lead automatically.
+                  if (autoRunning && !autoPaused && !['initiating', 'ringing', 'connected'].includes(callStatus)) {
+                    const next = leads.find((x) => x.id !== l.id && !x.calledInSession && x.status !== 'do_not_call');
+                    if (next) setTimeout(() => initiateCall(next), 500);
+                    else { setSessionComplete(true); setAutoRunning(false); }
+                  }
+                }}
                 isRunning={autoRunning} isPaused={autoPaused}
-                onStart={() => { setAutoRunning(true); setAutoPaused(false); }}
+                onStart={handleAutoStart}
                 onStop={() => { setAutoRunning(false); setAutoPaused(false); }}
-                onPause={() => setAutoPaused(true)} onResume={() => setAutoPaused(false)}
+                onPause={() => setAutoPaused(true)} onResume={handleAutoResume}
                 sessionComplete={sessionComplete} onResetSession={resetSession} hasAssignedNumber={dialerReady} />
             )}
             {areaTab === 'Call' && mode === 'Manual' && (

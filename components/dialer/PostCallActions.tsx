@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
-import { format } from 'date-fns';
 import type { PostCallPayload } from './CallDialog';
 
 const OUTCOMES = [
@@ -54,10 +53,9 @@ export default function PostCallActions({ lead, callDuration, enabled, onSave, o
   };
 
   const buildPayload = (): PostCallPayload => {
-    const durStr = `${Math.floor(callDuration / 60)}m ${callDuration % 60}s`;
-    const ts = format(new Date(), 'dd MMM yyyy, h:mm a');
-    const appendedNote = `[${ts}] Call duration: ${durStr}\n${notes || '—'}\n─────────────────────\n`;
-    return { outcome, notes: (lead?.notes ? lead.notes + '\n' : '') + appendedNote, callDuration, followUp, followUpDate, followUpTime, followUpNotes };
+    // Send only the raw notes the rep typed — the server timestamps and
+    // appends them to the lead's note history (avoids double-appending).
+    return { outcome, notes, callDuration, followUp, followUpDate, followUpTime, followUpNotes };
   };
 
   const handleSave = async (next: boolean) => {

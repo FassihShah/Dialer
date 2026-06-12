@@ -37,9 +37,9 @@ export default async function AdminDashboard() {
         <p className="text-sm text-slate-gray font-dm mt-0.5">Welcome back, {session?.user.name}</p>
       </div>
 
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-4 gap-4 mb-8 animate-fade-in-up">
         {stats.map((s) => (
-          <div key={s.label} className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
+          <div key={s.label} className="card-premium p-5 hover:shadow-lift transition-shadow">
             <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center mb-3`}>
               <s.icon size={20} className={s.color} />
             </div>
@@ -49,7 +49,7 @@ export default async function AdminDashboard() {
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+      <div className="card-premium overflow-hidden animate-fade-in-up">
         <div className="px-5 py-4 border-b border-slate-100">
           <h2 className="font-semibold text-navy font-bricolage">Recent Call Activity</h2>
         </div>

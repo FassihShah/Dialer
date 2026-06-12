@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { format } from 'date-fns';
 
 const schema = z.object({
-  leadId: z.string(),
+  leadId: z.string().optional().nullable(),
   callLogId: z.string().optional().nullable(),
   callSid: z.string().optional().nullable(),
   outcome: z.enum(['cold','warm','meeting_booked','not_interested','callback','no_answer','do_not_call']),
@@ -28,29 +28,31 @@ export async function POST(req: NextRequest) {
 
   const { leadId, callLogId, callSid, outcome, notes, durationSeconds, calledFromNumber, followUp, followUpDate, followUpTime, followUpNotes } = parsed.data;
 
-  // Verify lead ownership
-  const lead = await db.lead.findUnique({ where: { id: leadId } });
-  if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
-  if (lead.userId !== session.user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  // Verify lead ownership (leadId is optional — manual calls to non-leads have none)
+  const lead = leadId ? await db.lead.findUnique({ where: { id: leadId } }) : null;
+  if (leadId && !lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
+  if (lead && lead.userId !== session.user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const now = new Date();
   const timestamp = format(now, 'dd MMM yyyy, h:mm a');
   const durStr = `${Math.floor(durationSeconds / 60)}m ${durationSeconds % 60}s`;
   const appendNote = `[${timestamp}] Call duration: ${durStr}\n${notes || '—'}\n─────────────────────\n`;
-  const updatedNotes = (lead.notes ? lead.notes + '\n' : '') + appendNote;
 
-  // Update lead
-  await db.lead.update({
-    where: { id: leadId },
-    data: {
-      status: outcome as 'new',
-      notes: updatedNotes,
-      callCount: { increment: 1 },
-      lastCalledAt: now,
-      calledInSession: true,
-      ...(followUpDate ? { followUpDate: new Date(followUpDate), followUpNotes: followUpNotes || null } : {}),
-    },
-  });
+  // Update lead (only when this call is tied to a saved lead)
+  if (lead) {
+    const updatedNotes = (lead.notes ? lead.notes + '\n' : '') + appendNote;
+    await db.lead.update({
+      where: { id: lead.id },
+      data: {
+        status: outcome as 'new',
+        notes: updatedNotes,
+        callCount: { increment: 1 },
+        lastCalledAt: now,
+        calledInSession: true,
+        ...(followUpDate ? { followUpDate: new Date(followUpDate), followUpNotes: followUpNotes || null } : {}),
+      },
+    });
+  }
 
   // Update or create call log
   let log;
@@ -64,9 +66,9 @@ export async function POST(req: NextRequest) {
     log = await db.callLog.create({
       data: {
         userId: session.user.id,
-        leadId,
-        leadName: lead.fullName,
-        leadCompany: lead.companyName || null,
+        leadId: leadId || null,
+        leadName: lead?.fullName || null,
+        leadCompany: lead?.companyName || null,
         callSid: callSid || null,
         calledFromId: phoneNum?.id || null,
         calledFromNumber: calledFromNumber || null,
@@ -81,11 +83,11 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Create follow-up record
-  if (followUp && followUpDate) {
+  // Create follow-up record (requires a real lead)
+  if (followUp && followUpDate && lead) {
     await db.followUp.create({
       data: {
-        leadId,
+        leadId: lead.id,
         userId: session.user.id,
         followUpDate: new Date(followUpDate),
         followUpTime: followUpTime || null,
@@ -94,8 +96,8 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Auto-add to DNC list if outcome is do_not_call
-  if (outcome === 'do_not_call') {
+  // Auto-add to DNC list if outcome is do_not_call (requires a real lead)
+  if (outcome === 'do_not_call' && lead) {
     await db.dNCEntry.create({
       data: {
         contactName: lead.fullName,

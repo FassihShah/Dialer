@@ -25,29 +25,29 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-navy to-slate-800 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md animate-fade-in-up">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-electric-blue rounded-2xl mb-4 shadow-lg shadow-blue-500/30">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-electric-blue to-blue-600 rounded-2xl mb-4 shadow-lg shadow-blue-500/30 animate-scale-in">
             <PhoneCall size={28} className="text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-white font-bricolage">Smart Logics Dialer</h1>
-          <p className="text-slate-400 text-sm mt-1 font-dm">Cold Calling CRM & Dialer Platform</p>
+          <h1 className="text-3xl font-bold text-white font-bricolage tracking-tight">Smart Logics Dialer</h1>
+          <p className="text-slate-400 text-sm mt-1.5 font-dm">Cold Calling CRM & Dialer Platform</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
+        <div className="bg-white rounded-2xl shadow-lift p-8">
           <h2 className="text-xl font-bold text-navy font-bricolage mb-6">Sign In</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-gray uppercase tracking-wider mb-1.5 font-dm">Email Address</label>
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email"
-                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-dm focus:outline-none focus:ring-2 focus:ring-electric-blue/30 focus:border-electric-blue transition-all"
+                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-dm focus:outline-none focus:ring-4 focus:ring-electric-blue/10 focus:border-electric-blue transition-all"
                 placeholder="you@company.com" />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-gray uppercase tracking-wider mb-1.5 font-dm">Password</label>
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password"
-                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-dm focus:outline-none focus:ring-2 focus:ring-electric-blue/30 focus:border-electric-blue transition-all"
+                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-dm focus:outline-none focus:ring-4 focus:ring-electric-blue/10 focus:border-electric-blue transition-all"
                 placeholder="••••••••" />
             </div>
 
@@ -58,7 +58,7 @@ export default function LoginPage() {
             )}
 
             <button type="submit" disabled={loading}
-              className="w-full py-3 bg-electric-blue hover:bg-blue-700 text-white font-semibold rounded-xl font-dm transition-all flex items-center justify-center gap-2 disabled:opacity-70 shadow-md shadow-blue-500/20 mt-2">
+              className="w-full py-3 bg-electric-blue hover:bg-blue-700 active:scale-[0.98] text-white font-semibold rounded-xl font-dm transition-all flex items-center justify-center gap-2 disabled:opacity-70 shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 mt-2">
               {loading ? <><Loader2 size={16} className="animate-spin" /> Signing in...</> : 'Sign In'}
             </button>
           </form>

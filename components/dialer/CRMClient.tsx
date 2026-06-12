@@ -103,10 +103,10 @@ export default function CRMClient() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="card-premium overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-100">
+            <tr className="bg-slate-50/60 border-b border-slate-100">
               {['Name', 'Company', 'Phone', 'Email', 'Status', 'Calls'].map((h) => (
                 <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider font-dm">{h}</th>
               ))}

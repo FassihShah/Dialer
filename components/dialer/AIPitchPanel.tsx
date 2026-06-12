@@ -47,7 +47,7 @@ export default function AIPitchPanel({ lead }: { lead: Lead }) {
         {error && (
           <div className="text-center py-6">
             <AlertCircle size={24} className="text-blue-300 mx-auto mb-2" />
-            <p className="text-xs text-blue-600 font-dm mb-3">Could not generate pitch. Check your ANTHROPIC_API_KEY.</p>
+            <p className="text-xs text-blue-600 font-dm mb-3">Could not generate pitch. Check your DEEPSEEK_API_KEY.</p>
             <button onClick={generate} className="text-xs text-blue-700 font-dm font-medium hover:underline">Try Again</button>
           </div>
         )}

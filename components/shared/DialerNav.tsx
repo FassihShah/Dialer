@@ -18,7 +18,7 @@ export default function DialerNav() {
   const { data: session } = useSession();
 
   return (
-    <nav className="w-16 flex flex-col items-center py-4 bg-navy border-r border-slate-800">
+    <nav className="w-16 flex flex-col items-center py-4 bg-gradient-to-b from-navy to-slate-900 border-r border-slate-800/60">
       <div className="w-9 h-9 bg-electric-blue rounded-xl flex items-center justify-center mb-6 flex-shrink-0">
         <PhoneCall size={18} className="text-white" />
       </div>
@@ -28,8 +28,8 @@ export default function DialerNav() {
           const active = pathname === n.href || (n.href !== '/dialer' && pathname.startsWith(n.href));
           return (
             <Link key={n.href} href={n.href} title={n.label}
-              className={cn('w-full aspect-square rounded-xl flex items-center justify-center transition-all',
-                active ? 'bg-electric-blue text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-700')}>
+              className={cn('w-full aspect-square rounded-xl flex items-center justify-center transition-all active:scale-95',
+                active ? 'bg-electric-blue text-white shadow-lg shadow-blue-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-700/70')}>
               <n.icon size={18} />
             </Link>
           );
