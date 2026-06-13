@@ -33,12 +33,12 @@ export default function PendingPage() {
             <Clock size={26} className="text-amber-600" />
           </div>
 
-          <h2 className="text-xl font-bold text-navy font-bricolage mb-2">Account Pending Approval</h2>
+          <h2 className="text-xl font-bold text-navy font-bricolage mb-2">Account Pending Setup</h2>
           <p className="text-slate-500 text-sm font-dm mb-1">
             Hi <span className="font-semibold text-navy">{session?.user?.name || session?.user?.email}</span>,
           </p>
           <p className="text-slate-500 text-sm font-dm mb-6">
-            Your account has been created and is waiting for an admin to approve it. You will get access to the dialer once approved.
+            Your account has been created and is waiting to be added to a workspace. Once a platform administrator places you in a workspace, you&apos;ll get access to the dialer.
           </p>
 
           <div className="bg-slate-50 rounded-xl p-4 mb-6 text-left space-y-2">
@@ -48,7 +48,7 @@ export default function PendingPage() {
             </div>
             <div className="flex items-center gap-2">
               <Clock size={14} className="text-amber-500 flex-shrink-0" />
-              <span className="text-xs text-slate-600 font-dm">Waiting for admin approval</span>
+              <span className="text-xs text-slate-600 font-dm">Waiting to be added to a workspace</span>
             </div>
           </div>
 

@@ -17,7 +17,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!user || user.status === 'suspended') return null;
         const valid = await bcrypt.compare(credentials.password as string, user.password);
         if (!valid) return null;
-        return { id: user.id, email: user.email, name: user.name, role: user.role, status: user.status };
+        return { id: user.id, email: user.email, name: user.name, role: user.role, status: user.status, workspaceId: user.workspaceId };
       },
     }),
   ],
@@ -25,14 +25,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async jwt({ token, user, trigger }) {
       // Re-fetch status from DB when session.update() is called
       if (trigger === 'update' && token.id) {
-        const dbUser = await db.user.findUnique({ where: { id: token.id as string }, select: { role: true, status: true } });
-        if (dbUser) { token.role = dbUser.role; token.status = dbUser.status; }
+        const dbUser = await db.user.findUnique({ where: { id: token.id as string }, select: { role: true, status: true, workspaceId: true } });
+        if (dbUser) { token.role = dbUser.role; token.status = dbUser.status; token.workspaceId = dbUser.workspaceId; }
         return token;
       }
       if (user) {
         token.id = user.id;
         token.role = (user as { role: UserRole }).role;
         token.status = (user as { status: UserStatus }).status;
+        token.workspaceId = (user as { workspaceId: string | null }).workspaceId;
       }
       return token;
     },
@@ -40,6 +41,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       session.user.id = token.id as string;
       session.user.role = token.role as UserRole;
       session.user.status = token.status as UserStatus;
+      session.user.workspaceId = (token.workspaceId ?? null) as string | null;
       return session;
     },
   },

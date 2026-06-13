@@ -24,6 +24,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
+  // Ensure the target user is in the admin's workspace.
+  const target = await db.user.findUnique({ where: { id }, select: { workspaceId: true } });
+  if (!target || target.workspaceId !== session.user.workspaceId) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
   const data: Record<string, unknown> = { ...parsed.data };
   if (data.password) {
     data.password = await bcrypt.hash(data.password as string, 12);
@@ -40,6 +44,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   const { id } = await params;
   if (id === session.user.id) return NextResponse.json({ error: 'Cannot delete yourself' }, { status: 400 });
+
+  const target = await db.user.findUnique({ where: { id }, select: { workspaceId: true } });
+  if (!target || target.workspaceId !== session.user.workspaceId) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   await db.user.update({ where: { id }, data: { status: 'suspended' } });
   await audit({ userId: session.user.id, action: 'suspend_user', entityType: 'User', entityId: id });

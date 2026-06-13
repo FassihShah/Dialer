@@ -17,6 +17,7 @@ export async function GET() {
   if (!session?.user || session.user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const users = await db.user.findMany({
+    where: { workspaceId: session.user.workspaceId },
     select: {
       id: true, email: true, name: true, role: true, status: true,
       agentPhone: true, subscriberReference: true, createdAt: true,
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   const hashed = await bcrypt.hash(parsed.data.password, 12);
   const user = await db.user.create({
-    data: { ...parsed.data, password: hashed, status: 'active', createdById: session.user.id },
+    data: { ...parsed.data, password: hashed, status: 'active', createdById: session.user.id, workspaceId: session.user.workspaceId },
   });
 
   await audit({ userId: session.user.id, action: 'create_user', entityType: 'User', entityId: user.id });

@@ -17,8 +17,9 @@ export async function GET(req: NextRequest) {
   since.setHours(0, 0, 0, 0);
   since.setDate(since.getDate() - (days - 1));
 
+  const ws = session.user.workspaceId;
   const logs = await db.callLog.findMany({
-    where: { dateTime: { gte: since } },
+    where: { workspaceId: ws, dateTime: { gte: since } },
     select: {
       id: true, userId: true, durationSeconds: true, outcome: true, dateTime: true,
       followUpCreated: true, user: { select: { id: true, name: true } },
@@ -79,8 +80,8 @@ export async function GET(req: NextRequest) {
     .sort((x, y) => y.calls - x.calls);
 
   // Lead pipeline snapshot (all-time, by current status)
-  const leadGroups = await db.lead.groupBy({ by: ['status'], _count: { _all: true } });
-  const pendingFollowUps = await db.followUp.count({ where: { status: 'pending' } });
+  const leadGroups = await db.lead.groupBy({ by: ['status'], where: { workspaceId: ws }, _count: { _all: true } });
+  const pendingFollowUps = await db.followUp.count({ where: { workspaceId: ws, status: 'pending' } });
 
   return NextResponse.json({
     range: { days, since: since.toISOString() },

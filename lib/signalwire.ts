@@ -11,10 +11,15 @@ export interface SWConfig {
   dialAddress?: string | null;
 }
 
-/** Load the active VoIPConfig from DB only. Configure via Admin → Settings. */
-export async function getActiveConfig(): Promise<SWConfig | null> {
-  let record = await db.voIPConfig.findFirst({ where: { active: true } });
-  if (!record) record = await db.voIPConfig.findFirst({ orderBy: { createdAt: 'desc' } });
+/**
+ * Load the active VoIPConfig for a workspace. Configure via Admin → Settings.
+ * When `workspaceId` is omitted/null the lookup is unscoped (legacy/global) —
+ * kept only for callers without a workspace context.
+ */
+export async function getActiveConfig(workspaceId?: string | null): Promise<SWConfig | null> {
+  const scope = workspaceId ? { workspaceId } : {};
+  let record = await db.voIPConfig.findFirst({ where: { ...scope, active: true } });
+  if (!record) record = await db.voIPConfig.findFirst({ where: scope, orderBy: { createdAt: 'desc' } });
 
   if (!record?.projectId || !record?.apiToken || !record?.spaceUrl) return null;
 

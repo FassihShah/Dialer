@@ -17,6 +17,7 @@ export async function GET() {
   if (!session?.user || session.user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const numbers = await db.phoneNumber.findMany({
+    where: { workspaceId: session.user.workspaceId },
     include: { assignment: { include: { user: { select: { id: true, name: true, email: true } } } } },
     orderBy: { createdAt: 'asc' },
   });
@@ -27,6 +28,23 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user || session.user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
+  const workspaceId = session.user.workspaceId;
+  const addedById = session.user.id;
+
+  // Phone numbers are globally unique rows. Upsert only into the caller's own
+  // workspace; refuse to touch a number already owned by another workspace.
+  async function upsertNumber(data: z.infer<typeof schema>) {
+    const existing = await db.phoneNumber.findUnique({ where: { phoneNumber: data.phoneNumber }, select: { id: true, workspaceId: true } });
+    if (existing && existing.workspaceId && existing.workspaceId !== workspaceId) {
+      return { error: 'This number is already registered to another workspace', phoneNumber: data.phoneNumber };
+    }
+    return db.phoneNumber.upsert({
+      where: { phoneNumber: data.phoneNumber },
+      update: { ...data, addedById, workspaceId },
+      create: { ...data, addedById, workspaceId },
+    });
+  }
+
   const body = await req.json();
   // Batch import support
   if (Array.isArray(body)) {
@@ -34,12 +52,7 @@ export async function POST(req: NextRequest) {
     for (const item of body) {
       const parsed = schema.safeParse(item);
       if (!parsed.success) { results.push({ error: parsed.error.flatten(), item }); continue; }
-      const num = await db.phoneNumber.upsert({
-        where: { phoneNumber: parsed.data.phoneNumber },
-        update: { ...parsed.data, addedById: session.user.id },
-        create: { ...parsed.data, addedById: session.user.id },
-      });
-      results.push(num);
+      results.push(await upsertNumber(parsed.data));
     }
     return NextResponse.json(results);
   }
@@ -47,10 +60,5 @@ export async function POST(req: NextRequest) {
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const num = await db.phoneNumber.upsert({
-    where: { phoneNumber: parsed.data.phoneNumber },
-    update: { ...parsed.data, addedById: session.user.id },
-    create: { ...parsed.data, addedById: session.user.id },
-  });
-  return NextResponse.json(num);
+  return NextResponse.json(await upsertNumber(parsed.data));
 }

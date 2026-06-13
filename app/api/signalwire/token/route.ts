@@ -6,7 +6,7 @@ export async function POST() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const config = await getActiveConfig();
+  const config = await getActiveConfig(session.user.workspaceId);
   if (!config) return NextResponse.json({ success: false, error: 'No VoIPConfig found. Configure it in Admin → Settings.' });
 
   const result = await generateToken(config);

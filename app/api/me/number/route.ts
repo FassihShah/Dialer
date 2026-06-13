@@ -15,7 +15,7 @@ export async function GET() {
     include: { phoneNumber: true },
   });
 
-  const config = await getActiveConfig();
+  const config = await getActiveConfig(session.user.workspaceId);
   let callingReady = false;
   let callingError: string | null = null;
 

@@ -21,11 +21,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
   const user = await db.user.findUnique({
     where: { id: userId },
     select: {
-      id: true, name: true, email: true, role: true, status: true, createdAt: true,
+      id: true, name: true, email: true, role: true, status: true, createdAt: true, workspaceId: true,
       phoneAssignment: { include: { phoneNumber: true } },
     },
   });
-  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+  if (!user || user.workspaceId !== session.user.workspaceId) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
   const logs = await db.callLog.findMany({
     where: { userId, dateTime: { gte: since } },

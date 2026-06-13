@@ -10,6 +10,7 @@ datasource db {
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
 enum UserRole {
+  super_admin
   admin
   user
 }
@@ -66,6 +67,27 @@ enum ImportStatus {
 
 // ─── Models ──────────────────────────────────────────────────────────────────
 
+model Workspace {
+  id           String     @id @default(cuid())
+  name         String
+  slug         String     @unique
+  status       UserStatus @default(active)
+  createdById  String?    @map("created_by_id")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  users         User[]
+  leads         Lead[]
+  phoneNumbers  PhoneNumber[]
+  voipConfigs   VoIPConfig[]
+  callLogs      CallLog[]
+  followUps     FollowUp[]
+  dncEntries    DNCEntry[]
+  importBatches ImportBatch[]
+
+  @@map("workspaces")
+}
+
 model User {
   id                   String        @id @default(cuid())
   email                String        @unique
@@ -74,7 +96,10 @@ model User {
   role                 UserRole      @default(user)
   status               UserStatus    @default(pending)
   agentPhone           String?       @map("agent_phone")
+  // NOTE: super_admin users have workspaceId = null (cross-tenant)
   subscriberReference  String?       @map("subscriber_reference")
+  workspaceId          String?       @map("workspace_id")
+  workspace            Workspace?    @relation(fields: [workspaceId], references: [id])
   createdAt            DateTime      @default(now()) @map("created_at")
   updatedAt            DateTime      @updatedAt @map("updated_at")
   createdById          String?       @map("created_by_id")
@@ -93,6 +118,8 @@ model Lead {
   id                 String      @id @default(cuid())
   userId             String      @map("user_id")
   user               User        @relation(fields: [userId], references: [id])
+  workspaceId        String?     @map("workspace_id")
+  workspace          Workspace?  @relation(fields: [workspaceId], references: [id])
 
   fullName           String      @map("full_name")
   companyName        String?     @map("company_name")
@@ -120,18 +147,22 @@ model Lead {
   followUps          FollowUp[]
 
   @@index([userId])
+  @@index([workspaceId])
   @@index([normalizedPhone])
   @@index([normalizedEmail])
   @@map("leads")
 }
 
-// Global dedup indexes — PostgreSQL partial unique indexes are defined via migration
-// normalizedPhone: unique where normalizedPhone IS NOT NULL
-// normalizedEmail: unique where normalizedEmail IS NOT NULL
+// Per-workspace dedup indexes — PostgreSQL partial unique indexes defined via migration
+// (workspace_id, normalizedPhone): unique where normalizedPhone IS NOT NULL
+// (workspace_id, normalizedEmail): unique where normalizedEmail IS NOT NULL
+// See migration 0002_workspaces.
 
 model PhoneNumber {
   id             String      @id @default(cuid())
   phoneNumber    String      @unique @map("phone_number")
+  workspaceId    String?     @map("workspace_id")
+  workspace      Workspace?  @relation(fields: [workspaceId], references: [id])
   label          String?
   country        String?
   countryCode    String?     @map("country_code")
@@ -145,6 +176,7 @@ model PhoneNumber {
   assignment     PhoneNumberAssignment?
   callLogs       CallLog[]
 
+  @@index([workspaceId])
   @@map("phone_numbers")
 }
 
@@ -167,6 +199,8 @@ model CallLog {
   id               String       @id @default(cuid())
   userId           String       @map("user_id")
   user             User         @relation(fields: [userId], references: [id])
+  workspaceId      String?      @map("workspace_id")
+  workspace        Workspace?   @relation(fields: [workspaceId], references: [id])
   leadId           String?      @map("lead_id")
   lead             Lead?        @relation(fields: [leadId], references: [id])
   leadName         String?      @map("lead_name")
@@ -186,6 +220,7 @@ model CallLog {
   createdAt        DateTime     @default(now()) @map("created_at")
 
   @@index([userId])
+  @@index([workspaceId])
   @@index([leadId])
   @@index([callSid])
   @@map("call_logs")
@@ -197,6 +232,8 @@ model FollowUp {
   lead            Lead           @relation(fields: [leadId], references: [id])
   userId          String         @map("user_id")
   user            User           @relation(fields: [userId], references: [id])
+  workspaceId     String?        @map("workspace_id")
+  workspace       Workspace?     @relation(fields: [workspaceId], references: [id])
   followUpDate    DateTime       @map("follow_up_date")
   followUpTime    String?        @map("follow_up_time")
   followUpNotes   String?        @map("follow_up_notes") @db.Text
@@ -206,12 +243,15 @@ model FollowUp {
   updatedAt       DateTime       @updatedAt @map("updated_at")
 
   @@index([userId])
+  @@index([workspaceId])
   @@index([leadId])
   @@map("follow_ups")
 }
 
 model DNCEntry {
   id            String    @id @default(cuid())
+  workspaceId   String?   @map("workspace_id")
+  workspace     Workspace? @relation(fields: [workspaceId], references: [id])
   contactName   String?   @map("contact_name")
   email         String?
   normalizedEmail String? @map("normalized_email")
@@ -224,6 +264,7 @@ model DNCEntry {
   notes         String?
   createdAt     DateTime  @default(now()) @map("created_at")
 
+  @@index([workspaceId])
   @@index([normalizedPhone])
   @@index([normalizedEmail])
   @@map("dnc_entries")
@@ -231,6 +272,8 @@ model DNCEntry {
 
 model VoIPConfig {
   id                         String   @id @default(cuid())
+  workspaceId                String?  @map("workspace_id")
+  workspace                  Workspace? @relation(fields: [workspaceId], references: [id])
   provider                   String   @default("signalwire")
   projectId                  String   @map("project_id")
   apiToken                   String   @map("api_token")
@@ -244,6 +287,7 @@ model VoIPConfig {
   createdAt                  DateTime @default(now()) @map("created_at")
   updatedAt                  DateTime @updatedAt @map("updated_at")
 
+  @@index([workspaceId])
   @@map("voip_configs")
 }
 
@@ -251,6 +295,8 @@ model ImportBatch {
   id              String       @id @default(cuid())
   userId          String       @map("user_id")
   user            User         @relation(fields: [userId], references: [id])
+  workspaceId     String?      @map("workspace_id")
+  workspace       Workspace?   @relation(fields: [workspaceId], references: [id])
   fileName        String?      @map("file_name")
   totalRows       Int          @default(0) @map("total_rows")
   importedRows    Int          @default(0) @map("imported_rows")

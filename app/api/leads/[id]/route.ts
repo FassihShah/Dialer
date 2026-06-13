@@ -30,7 +30,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const lead = await db.lead.findUnique({ where: { id } });
   if (!lead) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   // Enforce data isolation
-  if (lead.userId !== session.user.id && session.user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const canAccess = lead.userId === session.user.id ||
+    (session.user.role === 'admin' && lead.workspaceId === session.user.workspaceId);
+  if (!canAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   return NextResponse.json(lead);
 }
 
@@ -41,7 +43,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const existing = await db.lead.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  if (existing.userId !== session.user.id && session.user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (existing.userId !== session.user.id &&
+      !(session.user.role === 'admin' && existing.workspaceId === session.user.workspaceId)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const body = await req.json();
   const parsed = updateSchema.safeParse(body);
@@ -64,7 +69,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   const existing = await db.lead.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  if (existing.userId !== session.user.id && session.user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (existing.userId !== session.user.id &&
+      !(session.user.role === 'admin' && existing.workspaceId === session.user.workspaceId)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   await db.lead.delete({ where: { id } });
   return NextResponse.json({ ok: true });

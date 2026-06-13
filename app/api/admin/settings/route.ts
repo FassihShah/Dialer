@@ -19,8 +19,9 @@ export async function GET() {
   const session = await auth();
   if (!session?.user || session.user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const config = await db.voIPConfig.findFirst({ where: { active: true } }) ||
-    await db.voIPConfig.findFirst({ orderBy: { createdAt: 'desc' } });
+  const ws = session.user.workspaceId;
+  const config = await db.voIPConfig.findFirst({ where: { workspaceId: ws, active: true } }) ||
+    await db.voIPConfig.findFirst({ where: { workspaceId: ws }, orderBy: { createdAt: 'desc' } });
 
   if (!config) return NextResponse.json(null);
 
@@ -40,11 +41,13 @@ export async function PUT(req: NextRequest) {
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  // Deactivate all existing configs
-  await db.voIPConfig.updateMany({ data: { active: false } });
+  const ws = session.user.workspaceId;
 
-  const existing = await db.voIPConfig.findFirst();
-  const data = { ...parsed.data, configuredById: session.user.id };
+  // Deactivate only THIS workspace's configs — never touch other tenants'.
+  await db.voIPConfig.updateMany({ where: { workspaceId: ws }, data: { active: false } });
+
+  const existing = await db.voIPConfig.findFirst({ where: { workspaceId: ws } });
+  const data = { ...parsed.data, configuredById: session.user.id, workspaceId: ws };
 
   // If tokens contain masking dots, keep the existing values
   if (data.apiToken.includes('•')) {

@@ -18,12 +18,21 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
   const { userId, phoneNumberId } = parsed.data;
+  const ws = session.user.workspaceId;
+
+  // The target user must belong to the admin's workspace.
+  const targetUser = await db.user.findUnique({ where: { id: userId }, select: { workspaceId: true } });
+  if (!targetUser || targetUser.workspaceId !== ws) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
   if (phoneNumberId === null) {
     // Unassign
     await db.phoneNumberAssignment.deleteMany({ where: { userId } });
     return NextResponse.json({ ok: true, unassigned: true });
   }
+
+  // The number must belong to the admin's workspace too.
+  const targetNumber = await db.phoneNumber.findUnique({ where: { id: phoneNumberId }, select: { workspaceId: true } });
+  if (!targetNumber || targetNumber.workspaceId !== ws) return NextResponse.json({ error: 'Number not found' }, { status: 404 });
 
   // Check number isn't already assigned to another user
   const existing = await db.phoneNumberAssignment.findUnique({ where: { phoneNumberId } });

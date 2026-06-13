@@ -49,8 +49,9 @@ export async function POST(req: NextRequest) {
 
   if (!Array.isArray(rows)) return NextResponse.json({ error: 'rows must be an array' }, { status: 400 });
 
+  const workspaceId = session.user.workspaceId ?? null;
   const batch = await db.importBatch.create({
-    data: { userId: session.user.id, fileName: fileName || null, totalRows: rows.length, status: 'processing' },
+    data: { userId: session.user.id, workspaceId, fileName: fileName || null, totalRows: rows.length, status: 'processing' },
   });
 
   const mapped = rows.map(mapRow);
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
   });
 
   const validMapped = mapped.filter((_, i) => !invalidIndices.has(i));
-  const dupIndices = await bulkCheckDuplicates(validMapped.map((m) => ({ phone: m.phone, email: m.email })));
+  const dupIndices = await bulkCheckDuplicates(workspaceId, validMapped.map((m) => ({ phone: m.phone, email: m.email })));
 
   let importedRows = 0;
   let queueStart = await db.lead.count({ where: { userId: session.user.id } });
@@ -85,6 +86,7 @@ export async function POST(req: NextRequest) {
     toInsert.push({
       ...m,
       userId: session.user.id,
+      workspaceId,
       normalizedPhone: normalizePhone(m.phone),
       normalizedEmail: normalizeEmail(m.email),
       queueOrder: queueStart + importedRows,

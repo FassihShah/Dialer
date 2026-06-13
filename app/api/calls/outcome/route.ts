@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
   const { leadId, callLogId, callSid, outcome, notes, durationSeconds, calledFromNumber, followUp, followUpDate, followUpTime, followUpNotes } = parsed.data;
+  const workspaceId = session.user.workspaceId ?? null;
 
   // Verify lead ownership (leadId is optional — manual calls to non-leads have none)
   const lead = leadId ? await db.lead.findUnique({ where: { id: leadId } }) : null;
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
     log = await db.callLog.create({
       data: {
         userId: session.user.id,
+        workspaceId,
         leadId: leadId || null,
         leadName: lead?.fullName || null,
         leadCompany: lead?.companyName || null,
@@ -89,6 +91,7 @@ export async function POST(req: NextRequest) {
       data: {
         leadId: lead.id,
         userId: session.user.id,
+        workspaceId,
         followUpDate: new Date(followUpDate),
         followUpTime: followUpTime || null,
         followUpNotes: followUpNotes || null,
@@ -100,6 +103,7 @@ export async function POST(req: NextRequest) {
   if (outcome === 'do_not_call' && lead) {
     await db.dNCEntry.create({
       data: {
+        workspaceId,
         contactName: lead.fullName,
         email: lead.email || null,
         normalizedEmail: lead.normalizedEmail || null,

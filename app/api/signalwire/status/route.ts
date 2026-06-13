@@ -12,7 +12,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const config = await getActiveConfig();
+  const config = await getActiveConfig(session.user.workspaceId);
   if (!config) {
     return NextResponse.json({
       configured: false,
@@ -29,6 +29,7 @@ export async function GET() {
 
   // Cross-reference SignalWire numbers with DB assignments.
   const dbNumbers = await db.phoneNumber.findMany({
+    where: { workspaceId: session.user.workspaceId },
     include: { assignment: { include: { user: { select: { id: true, name: true, email: true } } } } },
   });
   const dbByNumber = new Map(dbNumbers.map((n) => [n.phoneNumber, n]));

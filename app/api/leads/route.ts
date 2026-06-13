@@ -59,7 +59,8 @@ export async function POST(req: NextRequest) {
   const nPhone = normalizePhone(phone);
   const nEmail = normalizeEmail(email);
 
-  const dup = await isDuplicate(phone, email);
+  const workspaceId = session.user.workspaceId ?? null;
+  const dup = await isDuplicate(workspaceId, phone, email);
   if (dup) return NextResponse.json({ error: 'A lead with this phone or email already exists in the system.' }, { status: 409 });
 
   const count = await db.lead.count({ where: { userId: session.user.id } });
@@ -67,6 +68,7 @@ export async function POST(req: NextRequest) {
     data: {
       ...parsed.data,
       userId: session.user.id,
+      workspaceId,
       normalizedPhone: nPhone,
       normalizedEmail: nEmail,
       queueOrder: count,

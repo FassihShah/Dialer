@@ -6,6 +6,7 @@ export default async function Root() {
   if (!session?.user) redirect('/login');
   if (session.user.status === 'pending') redirect('/pending');
   if (session.user.status === 'suspended') redirect('/login');
+  if (session.user.role === 'super_admin') redirect('/super');
   if (session.user.role === 'admin') redirect('/admin/dashboard');
   redirect('/dialer');
 }

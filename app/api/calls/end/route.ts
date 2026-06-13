@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   const id = callId || callSid;
   if (!id) return NextResponse.json({ success: false, error: 'callId required' });
 
-  const config = await getActiveConfig();
+  const config = await getActiveConfig(session.user.workspaceId);
   if (config) {
     const status = await endCall(config, id);
     if (![200, 201, 204, 404, 422].includes(status)) {

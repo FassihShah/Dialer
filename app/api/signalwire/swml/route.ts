@@ -63,7 +63,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ version: '1.0.0', sections: { main: [{ say: { text: `Error: invalid phone number.` } }] } });
     }
 
-    // Determine caller ID: user's assigned number → VoIPConfig default → first active number
+    // Resolve the calling user's workspace so all telephony lookups stay tenant-scoped.
+    let workspaceId: string | null = null;
+    if (callerId) {
+      const caller = await db.user.findUnique({ where: { id: callerId }, select: { workspaceId: true } });
+      workspaceId = caller?.workspaceId ?? null;
+    }
+
+    // Determine caller ID: user's assigned number → workspace VoIPConfig default → workspace's first active number
     let fromNumber: string | null = null;
 
     if (callerId) {
@@ -75,12 +82,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (!fromNumber) {
-      const config = await getActiveConfig();
+      const config = await getActiveConfig(workspaceId);
       fromNumber = config?.signalwireNumber || null;
     }
 
     if (!fromNumber) {
-      const pool = await db.phoneNumber.findFirst({ where: { status: 'active' } });
+      const pool = await db.phoneNumber.findFirst({ where: { status: 'active', ...(workspaceId ? { workspaceId } : {}) } });
       fromNumber = pool?.phoneNumber || null;
     }
 
@@ -93,6 +100,7 @@ export async function POST(req: NextRequest) {
       await db.callLog.create({
         data: {
           userId: callerId,
+          workspaceId: workspaceId || null,
           leadId: dialerLeadId || null,
           leadName: leadName || null,
           leadCompany: leadCompany || null,

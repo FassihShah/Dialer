@@ -4,14 +4,16 @@ import { Users, PhoneCall, Phone, TrendingUp } from 'lucide-react';
 
 export default async function AdminDashboard() {
   const session = await auth();
+  const ws = session?.user.workspaceId ?? null;
   const [userCount, leadCount, callCount, numberCount] = await Promise.all([
-    db.user.count({ where: { role: 'user', status: 'active' } }),
-    db.lead.count(),
-    db.callLog.count(),
-    db.phoneNumber.count({ where: { status: 'active' } }),
+    db.user.count({ where: { role: 'user', status: 'active', workspaceId: ws } }),
+    db.lead.count({ where: { workspaceId: ws } }),
+    db.callLog.count({ where: { workspaceId: ws } }),
+    db.phoneNumber.count({ where: { status: 'active', workspaceId: ws } }),
   ]);
 
   const recentCalls = await db.callLog.findMany({
+    where: { workspaceId: ws },
     orderBy: { dateTime: 'desc' },
     take: 10,
     include: { user: { select: { name: true } } },
