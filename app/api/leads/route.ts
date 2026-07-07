@@ -8,6 +8,7 @@ import { z } from 'zod';
 const createSchema = z.object({
   fullName: z.string().min(1),
   phone: z.string().min(1),
+  altPhones: z.string().optional().nullable(),
   email: z.string().email().optional().nullable(),
   companyName: z.string().optional().nullable(),
   companyWebsite: z.string().optional().nullable(),

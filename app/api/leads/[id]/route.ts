@@ -7,6 +7,7 @@ import { z } from 'zod';
 const updateSchema = z.object({
   fullName: z.string().min(1).optional(),
   phone: z.string().optional(),
+  altPhones: z.string().optional().nullable(),
   email: z.string().email().optional().nullable(),
   companyName: z.string().optional().nullable(),
   companyWebsite: z.string().optional().nullable(),

@@ -6,6 +6,7 @@ import { Plus, Upload, PhoneCall, Mic, MicOff } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { formatTimer } from '@/lib/utils';
 import type { Lead } from '@/types/dialer';
+import { getPhoneList } from '@/types/dialer';
 import LeadListPanel from './LeadListPanel';
 import AddLeadModal from './AddLeadModal';
 import CSVImportModal from './CSVImportModal';
@@ -57,6 +58,9 @@ export default function DialerClient() {
   const [callStartTime, setCallStartTime] = useState<number | null>(null);
   const [callDuration, setCallDuration] = useState(0);
   const [activeCallLogId, setActiveCallLogId] = useState<string | null>(null);
+
+  const [phoneAttemptIndex, setPhoneAttemptIndex] = useState(0);
+  const phoneAttemptIndexRef = useRef(0);
 
   const callTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const callSidRef = useRef<string | null>(null);
@@ -134,8 +138,9 @@ export default function DialerClient() {
   const showError = (msg: string) => toast({ title: 'Dialer Error', description: msg, variant: 'destructive' });
 
   // ── Place a browser call ────────────────────────────────────────────────────
-  const initiateCall = async (lead: Lead) => {
-    const rawPhone = lead.phone || dialNumber;
+  const initiateCall = async (lead: Lead, phoneIdx = 0) => {
+    const phones = getPhoneList(lead);
+    const rawPhone = phones[phoneIdx] || lead.phone || dialNumber;
     if (!rawPhone) return;
     if (!dialerReady || !swClientRef.current) { showError('Dialer not ready. Wait for initialization.'); return; }
     if (!dialAddress) { showError('No dial_address configured. Set it in Admin → Settings → SWML Script Address.'); return; }
@@ -148,6 +153,8 @@ export default function DialerClient() {
     setCallStatus('initiating');
     setCallDuration(0);
     setCallSid(null);
+    setPhoneAttemptIndex(phoneIdx);
+    phoneAttemptIndexRef.current = phoneIdx;
     setCallDialogOpen(true);
 
     // Fabric SDK: pass call data via userVariables (delivered to the SWML script).
@@ -231,6 +238,41 @@ export default function DialerClient() {
     handleCallEnded();
   };
 
+  // Log no_answer for the current attempt then dial the next number of the same lead.
+  const handleTryNextNumber = async () => {
+    if (!callLead) return;
+    const phones = getPhoneList(callLead);
+    const nextIdx = phoneAttemptIndexRef.current + 1;
+    if (nextIdx >= phones.length) return;
+
+    // Hang up any still-active leg
+    clearCallTimer();
+    if (activeCallRef.current) { try { await activeCallRef.current.hangup(); } catch {} activeCallRef.current = null; }
+
+    // Log no_answer for this attempt (non-blocking)
+    fetch('/api/calls/outcome', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        leadId: callLead.id || null,
+        callLogId: activeCallLogId,
+        callSid: callSidRef.current,
+        outcome: 'no_answer',
+        notes: `No answer on ${phones[phoneAttemptIndexRef.current]}. Trying next number.`,
+        durationSeconds: callDuration,
+        followUp: false, followUpDate: null, followUpTime: null, followUpNotes: null,
+      }),
+    }).catch(() => {});
+
+    setActiveCallLogId(null);
+    setCallSid(null);
+    callSidRef.current = null;
+    setCallDuration(0);
+
+    // Dial next number (keeps dialog open — initiateCall sets status to 'initiating')
+    await initiateCall(callLead, nextIdx);
+  };
+
   // ── Mutations ───────────────────────────────────────────────────────────────
   const createLeadMutation = useMutation({
     mutationFn: async (data: object) => {
@@ -283,19 +325,39 @@ export default function DialerClient() {
     setCallStatus('idle');
     setCallDuration(0);
     setActiveCallLogId(null);
+    setPhoneAttemptIndex(0);
+    phoneAttemptIndexRef.current = 0;
   };
 
   const handleSaveNext = async (payload: Parameters<typeof saveCallLog>[0]) => {
     if (!callLead) return;
+
+    // In auto mode: if no_answer and lead has more untried numbers, try next instead of advancing.
+    if (mode === 'Auto' && autoRunning && !autoPaused && payload.outcome === 'no_answer') {
+      const phones = getPhoneList(callLead);
+      const nextIdx = phoneAttemptIndexRef.current + 1;
+      if (nextIdx < phones.length) {
+        await saveCallLog(payload, callLead);
+        setActiveCallLogId(null);
+        setCallSid(null);
+        callSidRef.current = null;
+        setTimeout(() => initiateCall(callLead, nextIdx), 1500);
+        return; // dialog stays open; initiateCall resets it to 'initiating'
+      }
+    }
+
     await saveCallLog(payload, callLead);
     setCallDialogOpen(false);
     setCallStatus('idle');
     setCallDuration(0);
     setActiveCallLogId(null);
+    setPhoneAttemptIndex(0);
+    phoneAttemptIndexRef.current = 0;
+
     if (mode === 'Auto' && autoRunning && !autoPaused) {
       const remaining = leads.filter((l) => !l.calledInSession && l.status !== 'do_not_call' && l.id !== callLead.id);
       if (remaining.length === 0) { setSessionComplete(true); setAutoRunning(false); return; }
-      setTimeout(() => initiateCall(remaining[0]), 3000);
+      setTimeout(() => initiateCall(remaining[0], 0), 3000);
     }
   };
 
@@ -305,7 +367,7 @@ export default function DialerClient() {
     setAutoPaused(false);
     setSessionComplete(false);
     const next = leads.find((l) => !l.calledInSession && l.status !== 'do_not_call');
-    if (next) initiateCall(next);
+    if (next) initiateCall(next, 0);
     else { setSessionComplete(true); setAutoRunning(false); }
   };
 
@@ -314,7 +376,7 @@ export default function DialerClient() {
     setAutoPaused(false);
     if (!['initiating', 'ringing', 'connected'].includes(callStatus)) {
       const next = leads.find((l) => !l.calledInSession && l.status !== 'do_not_call');
-      if (next) initiateCall(next);
+      if (next) initiateCall(next, 0);
     }
   };
 
@@ -444,7 +506,7 @@ export default function DialerClient() {
                   // If a session is running, advance to the next lead automatically.
                   if (autoRunning && !autoPaused && !['initiating', 'ringing', 'connected'].includes(callStatus)) {
                     const next = leads.find((x) => x.id !== l.id && !x.calledInSession && x.status !== 'do_not_call');
-                    if (next) setTimeout(() => initiateCall(next), 500);
+                    if (next) setTimeout(() => initiateCall(next, 0), 500);
                     else { setSessionComplete(true); setAutoRunning(false); }
                   }
                 }}
@@ -460,7 +522,7 @@ export default function DialerClient() {
                   number={dialNumber} onNumberChange={setDialNumber}
                   onCall={() => {
                     const matched = leads.find((l) => l.phone === dialNumber || l.phone.replace(/\s/g, '') === dialNumber.replace(/\s/g, ''));
-                    initiateCall(matched || { id: '', fullName: 'Manual Call', phone: dialNumber, companyName: null, companyWebsite: null, email: null, jobTitle: null, industry: null, region: null, notes: null, status: 'new', callCount: 0, lastCalledAt: null, followUpDate: null, calledInSession: false, queueOrder: 0 });
+                    initiateCall(matched || { id: '', fullName: 'Manual Call', phone: dialNumber, altPhones: null, companyName: null, companyWebsite: null, email: null, jobTitle: null, industry: null, region: null, notes: null, status: 'new', callCount: 0, lastCalledAt: null, followUpDate: null, calledInSession: false, queueOrder: 0 });
                   }}
                   selectedLead={selectedLead?.phone === dialNumber ? selectedLead : null}
                   onClearLead={() => setSelectedLead(null)}
@@ -480,7 +542,10 @@ export default function DialerClient() {
 
       <CallDialog
         open={callDialogOpen} lead={callLead} callStatus={callStatus} callDuration={callDuration}
+        phones={callLead ? getPhoneList(callLead) : []}
+        currentPhoneIndex={phoneAttemptIndex}
         onHangup={handleHangup} onSave={handleSave} onSaveNext={handleSaveNext}
+        onTryNextNumber={handleTryNextNumber}
         callingFromNumber="Browser"
       />
     </div>

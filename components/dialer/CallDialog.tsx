@@ -16,9 +16,12 @@ interface CallDialogProps {
   open: boolean; lead: Lead | null;
   callStatus: 'idle' | 'initiating' | 'ringing' | 'connected' | 'ended' | 'failed';
   callDuration: number;
+  phones?: string[];          // all phone numbers for this lead
+  currentPhoneIndex?: number; // which one is being called
   onHangup: () => void;
   onSave: (payload: PostCallPayload) => Promise<void>;
   onSaveNext: (payload: PostCallPayload) => Promise<void>;
+  onTryNextNumber?: () => void;
   callingFromNumber?: string;
 }
 
@@ -27,11 +30,13 @@ export interface PostCallPayload {
   followUp: boolean; followUpDate: string; followUpTime: string; followUpNotes: string;
 }
 
-export default function CallDialog({ open, lead, callStatus, callDuration, onHangup, onSave, onSaveNext, callingFromNumber }: CallDialogProps) {
+export default function CallDialog({ open, lead, callStatus, callDuration, phones = [], currentPhoneIndex = 0, onHangup, onSave, onSaveNext, onTryNextNumber, callingFromNumber }: CallDialogProps) {
   if (!open || !lead) return null;
 
   const isActive = ['initiating', 'ringing', 'connected'].includes(callStatus);
   const isEnded = ['ended', 'failed'].includes(callStatus);
+  const hasMoreNumbers = (currentPhoneIndex + 1) < phones.length;
+  const currentPhone = phones[currentPhoneIndex] || lead.phone;
 
   const headerBg = callStatus === 'connected' ? 'bg-emerald-50' : callStatus === 'ended' ? 'bg-slate-100' : callStatus === 'failed' ? 'bg-red-50' : 'bg-blue-50';
 
@@ -49,7 +54,15 @@ export default function CallDialog({ open, lead, callStatus, callDuration, onHan
               {callStatus === 'ended' && <><span className="w-2.5 h-2.5 rounded-full bg-slate-400" /><span className="text-slate-600 font-bold text-sm font-dm uppercase tracking-wider">CALL ENDED — {formatTimer(callDuration)}</span></>}
               {callStatus === 'failed' && <><span className="w-2.5 h-2.5 rounded-full bg-red-500" /><span className="text-red-600 font-bold text-sm font-dm uppercase tracking-wider">CALL FAILED</span></>}
             </div>
-            {callingFromNumber && <p className="text-[11px] text-slate-500 font-dm mt-0.5">Calling from: {callingFromNumber}</p>}
+            <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+            {callingFromNumber && <p className="text-[11px] text-slate-500 font-dm">From: {callingFromNumber}</p>}
+            <p className="text-[11px] text-slate-600 font-mono font-dm">→ {currentPhone}</p>
+            {phones.length > 1 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-600 font-dm font-medium">
+                Attempt {currentPhoneIndex + 1} / {phones.length}
+              </span>
+            )}
+          </div>
           </div>
           {isActive && (
             <button onClick={onHangup} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm rounded-lg font-medium font-dm flex items-center gap-2 transition-colors">
@@ -106,7 +119,9 @@ export default function CallDialog({ open, lead, callStatus, callDuration, onHan
           {/* AI Pitch + Post-call */}
           <div className="flex-1 p-5 flex flex-col gap-4 overflow-y-auto">
             <div className="h-64 flex-shrink-0"><AIPitchPanel lead={lead} /></div>
-            <PostCallActions lead={lead} callDuration={callDuration} enabled={isEnded} onSave={onSave} onSaveNext={onSaveNext} />
+            <PostCallActions lead={lead} callDuration={callDuration} enabled={isEnded}
+              hasMoreNumbers={hasMoreNumbers} onTryNextNumber={onTryNextNumber}
+              onSave={onSave} onSaveNext={onSaveNext} />
           </div>
         </div>
       </div>

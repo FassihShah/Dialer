@@ -9,6 +9,7 @@ interface RawRow {
   fullName?: string;
   name?: string;
   phone?: string;
+  altPhones?: string; // pre-processed by client: JSON array string of additional numbers
   email?: string;
   job_title?: string;
   jobTitle?: string;
@@ -29,6 +30,7 @@ function mapRow(raw: RawRow) {
   return {
     fullName: raw.full_name || raw.fullName || raw.name || '',
     phone: raw.phone || '',
+    altPhones: raw.altPhones || null,
     email: raw.email || null,
     jobTitle: raw.job_title || raw.jobTitle || null,
     companyName: raw.company_name || raw.companyName || raw.company || null,
@@ -89,6 +91,7 @@ export async function POST(req: NextRequest) {
       workspaceId,
       normalizedPhone: normalizePhone(m.phone),
       normalizedEmail: normalizeEmail(m.email),
+      altPhones: m.altPhones || null,
       queueOrder: queueStart + importedRows,
     });
     importedRows++;

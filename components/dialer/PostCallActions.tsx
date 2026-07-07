@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, PhoneForwarded } from 'lucide-react';
 import type { PostCallPayload } from './CallDialog';
 
 const OUTCOMES = [
@@ -15,10 +15,12 @@ const OUTCOMES = [
 
 interface Lead { id: string; fullName: string; notes: string | null; }
 
-export default function PostCallActions({ lead, callDuration, enabled, onSave, onSaveNext }: {
+export default function PostCallActions({ lead, callDuration, enabled, hasMoreNumbers, onSave, onSaveNext, onTryNextNumber }: {
   lead: Lead; callDuration: number; enabled: boolean;
+  hasMoreNumbers?: boolean;
   onSave: (p: PostCallPayload) => Promise<void>;
   onSaveNext: (p: PostCallPayload) => Promise<void>;
+  onTryNextNumber?: () => void;
 }) {
   const [outcome, setOutcome] = useState('');
   const [notes, setNotes] = useState('');
@@ -143,6 +145,20 @@ export default function PostCallActions({ lead, callDuration, enabled, onSave, o
           </div>
         )}
       </div>
+
+      {/* Try next number — shown when lead has more phones and no outcome is selected yet */}
+      {hasMoreNumbers && onTryNextNumber && !outcome && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-blue-800 font-dm">More numbers available</p>
+            <p className="text-xs text-blue-600 font-dm">Log no answer and dial the next number automatically.</p>
+          </div>
+          <button onClick={onTryNextNumber} disabled={saving}
+            className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg font-dm font-medium transition-colors whitespace-nowrap ml-3 flex-shrink-0">
+            <PhoneForwarded size={13} /> Try Next Number
+          </button>
+        </div>
+      )}
 
       <div className="flex gap-3 pt-1">
         <button onClick={() => handleSave(true)} disabled={saving}

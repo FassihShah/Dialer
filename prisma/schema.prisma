@@ -132,6 +132,7 @@ model Lead {
   industry           String?
   region             String?
   notes              String?     @db.Text
+  altPhones          String?     @map("alt_phones")
   status             LeadStatus  @default(new)
   callCount          Int         @default(0) @map("call_count")
   lastCalledAt       DateTime?   @map("last_called_at")

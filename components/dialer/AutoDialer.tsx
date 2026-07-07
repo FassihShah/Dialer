@@ -1,7 +1,8 @@
 'use client';
-import { Play, Pause, Square, RotateCcw, PhoneCall, SkipForward } from 'lucide-react';
+import { Play, Pause, Square, RotateCcw, PhoneCall, SkipForward, Phone } from 'lucide-react';
 import { cn, nameInitials, nameColor } from '@/lib/utils';
 import type { Lead } from '@/types/dialer';
+import { getPhoneList } from '@/types/dialer';
 
 export default function AutoDialer({ leads, onCall, onSkip, isRunning, isPaused, onStart, onStop, onPause, onResume, sessionComplete, onResetSession, hasAssignedNumber }: {
   leads: Lead[]; onCall: (l: Lead) => void; onSkip: (l: Lead | null) => void;
@@ -53,7 +54,14 @@ export default function AutoDialer({ leads, onCall, onSkip, isRunning, isPaused,
                 <div className="flex-1">
                   <p className="font-bold text-navy font-bricolage">{current.fullName}</p>
                   {current.companyName && <p className="text-sm text-slate-gray font-dm">{current.companyName}</p>}
-                  <p className="text-xs font-mono text-slate-500 mt-0.5">{current.phone}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-xs font-mono text-slate-500">{current.phone}</p>
+                    {getPhoneList(current).length > 1 && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-dm font-medium">
+                        <Phone size={9} /> {getPhoneList(current).length} numbers
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <button onClick={() => onSkip(current)} className="flex items-center gap-1.5 px-3 py-2 text-slate-500 hover:text-slate-700 text-sm font-dm border border-slate-200 rounded-lg hover:bg-slate-50 transition-all">
                   <SkipForward size={13} /> Skip
@@ -105,7 +113,12 @@ export default function AutoDialer({ leads, onCall, onSkip, isRunning, isPaused,
                     <p className="text-sm font-medium text-navy font-dm truncate">{l.fullName}</p>
                     {l.companyName && <p className="text-xs text-slate-gray font-dm truncate">{l.companyName}</p>}
                   </div>
-                  <span className="text-xs font-mono text-slate-400">{l.phone}</span>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <span className="text-xs font-mono text-slate-400">{l.phone}</span>
+                    {getPhoneList(l).length > 1 && (
+                      <span className="text-[10px] px-1 py-0.5 rounded bg-blue-100 text-blue-600 font-dm">+{getPhoneList(l).length - 1}</span>
+                    )}
+                  </div>
                 </div>
               ))}
               {remaining.length > 20 && <p className="text-xs text-slate-400 font-dm px-3">...and {remaining.length - 20} more</p>}
