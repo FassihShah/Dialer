@@ -29,15 +29,30 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get('status') || '';
   const limit = parseInt(searchParams.get('limit') || '500');
 
-  const where: Record<string, unknown> = { userId: session.user.id };
+  const userId = session.user.id;
+  // Agents see leads assigned to them OR their own self-created unassigned leads.
+  // Admins using the dialer also follow the same rule (self-created + assigned-to-self).
+  const ownershipClause = {
+    OR: [
+      { assignedToId: userId },
+      { userId, assignedToId: null },
+    ],
+  };
+  const where: Record<string, unknown> = { ...ownershipClause };
   if (status && status !== 'all') where.status = status;
   if (search) {
-    where.OR = [
-      { fullName: { contains: search, mode: 'insensitive' } },
-      { companyName: { contains: search, mode: 'insensitive' } },
-      { phone: { contains: search } },
-      { email: { contains: search, mode: 'insensitive' } },
+    where.AND = [
+      ownershipClause,
+      {
+        OR: [
+          { fullName: { contains: search, mode: 'insensitive' } },
+          { companyName: { contains: search, mode: 'insensitive' } },
+          { phone: { contains: search } },
+          { email: { contains: search, mode: 'insensitive' } },
+        ],
+      },
     ];
+    delete where.OR;
   }
 
   const leads = await db.lead.findMany({

@@ -104,7 +104,8 @@ model User {
   updatedAt            DateTime      @updatedAt @map("updated_at")
   createdById          String?       @map("created_by_id")
 
-  leads                Lead[]
+  leads                Lead[]        @relation("CreatedLeads")
+  assignedLeads        Lead[]        @relation("AssignedLeads")
   callLogs             CallLog[]
   followUps            FollowUp[]
   phoneAssignment      PhoneNumberAssignment?
@@ -117,9 +118,11 @@ model User {
 model Lead {
   id                 String      @id @default(cuid())
   userId             String      @map("user_id")
-  user               User        @relation(fields: [userId], references: [id])
+  user               User        @relation("CreatedLeads", fields: [userId], references: [id])
   workspaceId        String?     @map("workspace_id")
   workspace          Workspace?  @relation(fields: [workspaceId], references: [id])
+  assignedToId       String?     @map("assigned_to_id")
+  assignedTo         User?       @relation("AssignedLeads", fields: [assignedToId], references: [id], onDelete: SetNull)
 
   fullName           String      @map("full_name")
   companyName        String?     @map("company_name")
@@ -149,6 +152,7 @@ model Lead {
 
   @@index([userId])
   @@index([workspaceId])
+  @@index([assignedToId])
   @@index([normalizedPhone])
   @@index([normalizedEmail])
   @@map("leads")

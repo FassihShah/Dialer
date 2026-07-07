@@ -1,7 +1,9 @@
 'use client';
 import { useState, useRef, useMemo } from 'react';
-import { Upload, Download, AlertCircle, CheckCircle, X, ChevronDown } from 'lucide-react';
+import { Upload, Download, AlertCircle, CheckCircle, X, ChevronDown, UserCheck } from 'lucide-react';
 import Papa from 'papaparse';
+import { useSession } from 'next-auth/react';
+import { useQuery } from '@tanstack/react-query';
 import { COUNTRIES, parsePhoneList, isE164, type Country } from '@/lib/phone';
 
 // ── Field definitions ─────────────────────────────────────────────────────────
@@ -42,17 +44,31 @@ interface ImportResult {
   errors: Array<{ row: number; reason: string }>;
 }
 
+interface AgentUser { id: string; name: string; email: string; role: string; status: string; }
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function CSVImportModal({ open, onClose, onRefresh }: {
   open: boolean; onClose: () => void; onRefresh: () => void;
 }) {
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === 'admin';
+
+  const { data: allUsers = [] } = useQuery<AgentUser[]>({
+    queryKey: ['import_modal_users'],
+    queryFn: () => fetch('/api/admin/users').then((r) => r.json()),
+    enabled: isAdmin && open,
+    staleTime: 60_000,
+  });
+  const agents = allUsers.filter((u) => u.role === 'user' && u.status === 'active');
+
   const [step, setStep] = useState(1);
   const [csvData, setCsvData] = useState<{ headers: string[]; rows: Record<string, string>[] } | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [countryCode, setCountryCode] = useState('PK');
   const [countrySearch, setCountrySearch] = useState('');
   const [showCountryDrop, setShowCountryDrop] = useState(false);
+  const [assignedToId, setAssignedToId] = useState<string>('');
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -143,7 +159,7 @@ export default function CSVImportModal({ open, onClose, onRefresh }: {
     const r = await fetch('/api/leads/import', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rows, fileName }),
+      body: JSON.stringify({ rows, fileName, assignedToId: assignedToId || null }),
     });
 
     setProgress(100);
@@ -163,6 +179,7 @@ export default function CSVImportModal({ open, onClose, onRefresh }: {
   const reset = () => {
     setStep(1); setCsvData(null); setMapping({}); setProgress(0);
     setResult(null); setFileName(''); setCountrySearch(''); setShowCountryDrop(false);
+    setAssignedToId('');
   };
 
   const canImport = Object.values(mapping).includes('full_name') && Object.values(mapping).includes('phone');
@@ -330,6 +347,26 @@ export default function CSVImportModal({ open, onClose, onRefresh }: {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Assign to agent — admin only */}
+              {isAdmin && agents.length > 0 && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <UserCheck size={14} className="text-emerald-700" />
+                    <p className="text-xs font-semibold text-emerald-800 font-dm">Assign imported leads to an agent</p>
+                    <span className="text-xs text-emerald-600 font-dm">(optional)</span>
+                  </div>
+                  <select
+                    value={assignedToId}
+                    onChange={(e) => setAssignedToId(e.target.value)}
+                    className="w-full px-3 py-2 border border-emerald-200 rounded-lg text-sm font-dm bg-white focus:outline-none focus:border-emerald-500">
+                    <option value="">— Leave unassigned (assign later from Leads panel) —</option>
+                    {agents.map((u) => (
+                      <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
+                    ))}
+                  </select>
                 </div>
               )}
 

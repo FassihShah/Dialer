@@ -30,8 +30,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const lead = await db.lead.findUnique({ where: { id } });
   if (!lead) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  // Enforce data isolation
   const canAccess = lead.userId === session.user.id ||
+    lead.assignedToId === session.user.id ||
     (session.user.role === 'admin' && lead.workspaceId === session.user.workspaceId);
   if (!canAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   return NextResponse.json(lead);
@@ -45,6 +45,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const existing = await db.lead.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   if (existing.userId !== session.user.id &&
+      existing.assignedToId !== session.user.id &&
       !(session.user.role === 'admin' && existing.workspaceId === session.user.workspaceId)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }

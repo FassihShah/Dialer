@@ -522,7 +522,7 @@ export default function DialerClient() {
                   number={dialNumber} onNumberChange={setDialNumber}
                   onCall={() => {
                     const matched = leads.find((l) => l.phone === dialNumber || l.phone.replace(/\s/g, '') === dialNumber.replace(/\s/g, ''));
-                    initiateCall(matched || { id: '', fullName: 'Manual Call', phone: dialNumber, altPhones: null, companyName: null, companyWebsite: null, email: null, jobTitle: null, industry: null, region: null, notes: null, status: 'new', callCount: 0, lastCalledAt: null, followUpDate: null, calledInSession: false, queueOrder: 0 });
+                    initiateCall(matched || { id: '', fullName: 'Manual Call', phone: dialNumber, altPhones: null, assignedToId: null, companyName: null, companyWebsite: null, email: null, jobTitle: null, industry: null, region: null, notes: null, status: 'new', callCount: 0, lastCalledAt: null, followUpDate: null, calledInSession: false, queueOrder: 0 });
                   }}
                   selectedLead={selectedLead?.phone === dialNumber ? selectedLead : null}
                   onClearLead={() => setSelectedLead(null)}

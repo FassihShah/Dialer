@@ -16,6 +16,7 @@ export interface Lead {
   followUpDate: string | null;
   calledInSession: boolean;
   queueOrder: number;
+  assignedToId: string | null;
 }
 
 /** Parse a lead's phone list (primary + alternates). */

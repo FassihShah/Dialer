@@ -32,7 +32,9 @@ export async function POST(req: NextRequest) {
   // Verify lead ownership (leadId is optional — manual calls to non-leads have none)
   const lead = leadId ? await db.lead.findUnique({ where: { id: leadId } }) : null;
   if (leadId && !lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
-  if (lead && lead.userId !== session.user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (lead && lead.userId !== session.user.id && lead.assignedToId !== session.user.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const now = new Date();
   const timestamp = format(now, 'dd MMM yyyy, h:mm a');

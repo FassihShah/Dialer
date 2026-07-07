@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json();
-  const { rows, fileName }: { rows: RawRow[]; fileName?: string } = body;
+  const { rows, fileName, assignedToId }: { rows: RawRow[]; fileName?: string; assignedToId?: string | null } = body;
 
   if (!Array.isArray(rows)) return NextResponse.json({ error: 'rows must be an array' }, { status: 400 });
 
@@ -89,6 +89,7 @@ export async function POST(req: NextRequest) {
       ...m,
       userId: session.user.id,
       workspaceId,
+      assignedToId: assignedToId || null,
       normalizedPhone: normalizePhone(m.phone),
       normalizedEmail: normalizeEmail(m.email),
       altPhones: m.altPhones || null,
