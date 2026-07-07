@@ -1,9 +1,10 @@
 'use client';
-import { useState, useMemo, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Users, Phone, CheckSquare, Square, ChevronDown, UserCheck, UserX, Filter, RefreshCw } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Search, Users, CheckSquare, Square, ChevronDown, UserCheck, UserX, RefreshCw, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
+import CSVImportModal from '@/components/dialer/CSVImportModal';
 
 interface AgentUser {
   id: string;
@@ -45,6 +46,7 @@ export default function LeadsManagement() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [assignDropdownOpen, setAssignDropdownOpen] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const { data: leads = [], isLoading, refetch } = useQuery<AdminLead[]>({
     queryKey: ['admin_leads', search, statusFilter, assignedFilter],
@@ -107,10 +109,23 @@ export default function LeadsManagement() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="px-8 py-6 border-b border-slate-200 bg-white flex-shrink-0">
-        <h1 className="text-2xl font-bold text-navy font-bricolage">Lead Management</h1>
-        <p className="text-sm text-slate-gray font-dm mt-0.5">Assign leads to agents and track their progress</p>
+      <div className="px-8 py-6 border-b border-slate-200 bg-white flex-shrink-0 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-navy font-bricolage">Lead Management</h1>
+          <p className="text-sm text-slate-gray font-dm mt-0.5">Import leads, assign them to agents, and track progress</p>
+        </div>
+        <button
+          onClick={() => setImportOpen(true)}
+          className="flex items-center gap-2 px-5 py-2.5 bg-electric-blue hover:bg-blue-700 text-white text-sm rounded-xl font-dm font-medium transition-colors shadow-md shadow-blue-500/20">
+          <Upload size={15} /> Import CSV
+        </button>
       </div>
+
+      <CSVImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onRefresh={() => qc.invalidateQueries({ queryKey: ['admin_leads'] })}
+      />
 
       {/* Stats */}
       <div className="px-8 py-4 border-b border-slate-100 bg-slate-50 flex-shrink-0">
