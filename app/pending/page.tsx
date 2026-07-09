@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { PhoneCall, Clock, CheckCircle, Loader2, LogOut } from 'lucide-react';
 
@@ -7,19 +7,35 @@ export default function PendingPage() {
   const { data: session, update } = useSession();
   const [checking, setChecking] = useState(false);
   const [stillPending, setStillPending] = useState(false);
+  const redirectingRef = useRef(false);
 
-  const checkStatus = async () => {
-    setChecking(true);
-    setStillPending(false);
-    const updated = await update(); // re-fetches status from DB via JWT callback
-    if (updated?.user?.status === 'active') {
-      // Hard redirect so the browser sends the fresh JWT cookie to the server
-      window.location.href = '/';
-    } else {
-      setChecking(false);
-      setStillPending(true);
-    }
+  const checkStatus = async (silent = false) => {
+    if (redirectingRef.current) return;
+    if (!silent) { setChecking(true); setStillPending(false); }
+
+    try {
+      // Ask the server directly — avoids stale client-side state
+      const res = await fetch('/api/auth/me');
+      const data = await res.json();
+
+      if (data?.status === 'active') {
+        redirectingRef.current = true;
+        // Refresh the JWT cookie then hard-navigate
+        await update();
+        window.location.href = '/';
+        return;
+      }
+    } catch { /* network blip — ignore */ }
+
+    if (!silent) { setChecking(false); setStillPending(true); }
   };
+
+  // Auto-poll every 10 seconds so the user is redirected without manual action
+  useEffect(() => {
+    const id = setInterval(() => checkStatus(true), 10_000);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-navy to-slate-800 flex items-center justify-center p-4">
@@ -58,7 +74,7 @@ export default function PendingPage() {
             </div>
           )}
 
-          <button onClick={checkStatus} disabled={checking}
+          <button onClick={() => checkStatus(false)} disabled={checking}
             className="w-full py-3 bg-electric-blue hover:bg-blue-700 text-white font-semibold rounded-xl font-dm transition-all flex items-center justify-center gap-2 disabled:opacity-70 mb-3">
             {checking ? <><Loader2 size={16} className="animate-spin" /> Checking...</> : 'Check Approval Status'}
           </button>

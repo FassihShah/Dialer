@@ -22,18 +22,28 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user, trigger }) {
-      // Re-fetch status from DB when session.update() is called
-      if (trigger === 'update' && token.id) {
-        const dbUser = await db.user.findUnique({ where: { id: token.id as string }, select: { role: true, status: true, workspaceId: true } });
-        if (dbUser) { token.role = dbUser.role; token.status = dbUser.status; token.workspaceId = dbUser.workspaceId; }
-        return token;
-      }
+    async jwt({ token, user }) {
+      // On first sign-in, populate from the authorize() return value
       if (user) {
         token.id = user.id;
         token.role = (user as { role: UserRole }).role;
         token.status = (user as { status: UserStatus }).status;
         token.workspaceId = (user as { workspaceId: string | null }).workspaceId;
+        return token;
+      }
+      // On every subsequent request, re-read mutable fields from DB so that
+      // admin changes (workspace placement, suspension, role change) take
+      // effect immediately without requiring a re-login.
+      if (token.id) {
+        const dbUser = await db.user.findUnique({
+          where: { id: token.id as string },
+          select: { role: true, status: true, workspaceId: true },
+        });
+        if (dbUser) {
+          token.role = dbUser.role;
+          token.status = dbUser.status;
+          token.workspaceId = dbUser.workspaceId;
+        }
       }
       return token;
     },
