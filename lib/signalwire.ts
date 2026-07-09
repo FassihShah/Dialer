@@ -50,7 +50,7 @@ export async function generateToken(config: SWConfig): Promise<{ token: string }
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: basicAuth(config) },
-    body: JSON.stringify({ reference: ref, password: pwd }),
+    body: JSON.stringify({ reference: ref, password: pwd, expires_in: 86400 }),
   });
 
   const text = await res.text();

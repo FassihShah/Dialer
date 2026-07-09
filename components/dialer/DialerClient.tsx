@@ -221,7 +221,18 @@ export default function DialerClient() {
       if (call?.id) { setCallSid(call.id); callSidRef.current = call.id; }
       setCallStatus('ringing');
     } catch (err) {
-      showError((err as Error).message || 'Failed to place call.');
+      const msg = (err as Error).message || '';
+      const isExpired = msg.includes('authblock_is_expired') || msg.includes('expires_at') || msg.includes('422');
+      if (isExpired) {
+        // Token has expired — destroy the current client and let the SDK re-initialize
+        // so the next call attempt gets a fresh token automatically.
+        swClientRef.current = null;
+        setDialerReady(false);
+        setDeviceStatus('idle'); // triggers the initialization useEffect
+        showError('Session token expired. The dialer is reconnecting — please try again in a few seconds.');
+      } else {
+        showError(msg || 'Failed to place call.');
+      }
       setCallStatus('failed');
       activeCallRef.current = null;
       setTimeout(() => setCallStatus('idle'), 3000);
