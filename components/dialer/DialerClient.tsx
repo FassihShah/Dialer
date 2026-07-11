@@ -223,16 +223,20 @@ export default function DialerClient() {
     } catch (err) {
       const msg = (err as Error).message || '';
       const isExpired = msg.includes('authblock_is_expired') || msg.includes('expires_at') || msg.includes('422');
+      // NORMAL_CLEARING = SIP cause 16: call rejected / not answered before connect.
+      // This is a telephony outcome, not a system error — don't show a toast.
+      // The dialog stays open so the agent can log "No Answer" or another outcome.
+      const isNormalClearing = msg.includes('NORMAL_CLEARING') || msg.includes('normal_clearing');
+
       if (isExpired) {
-        // Token has expired — destroy the current client and let the SDK re-initialize
-        // so the next call attempt gets a fresh token automatically.
         swClientRef.current = null;
         setDialerReady(false);
-        setDeviceStatus('idle'); // triggers the initialization useEffect
+        setDeviceStatus('idle');
         showError('Session token expired. The dialer is reconnecting — please try again in a few seconds.');
-      } else {
+      } else if (!isNormalClearing) {
         showError(msg || 'Failed to place call.');
       }
+
       setCallStatus('failed');
       activeCallRef.current = null;
       setTimeout(() => setCallStatus('idle'), 3000);
@@ -331,7 +335,12 @@ export default function DialerClient() {
 
   const handleSave = async (payload: Parameters<typeof saveCallLog>[0]) => {
     if (!callLead) return;
-    await saveCallLog(payload, callLead);
+    try {
+      await saveCallLog(payload, callLead);
+    } catch (err) {
+      showError((err as Error).message || 'Failed to save call log. Please try again.');
+      return;
+    }
     setCallDialogOpen(false);
     setCallStatus('idle');
     setCallDuration(0);
@@ -348,7 +357,7 @@ export default function DialerClient() {
       const phones = getPhoneList(callLead);
       const nextIdx = phoneAttemptIndexRef.current + 1;
       if (nextIdx < phones.length) {
-        await saveCallLog(payload, callLead);
+        try { await saveCallLog(payload, callLead); } catch (err) { showError((err as Error).message || 'Failed to save call log.'); return; }
         setActiveCallLogId(null);
         setCallSid(null);
         callSidRef.current = null;
@@ -357,7 +366,12 @@ export default function DialerClient() {
       }
     }
 
-    await saveCallLog(payload, callLead);
+    try {
+      await saveCallLog(payload, callLead);
+    } catch (err) {
+      showError((err as Error).message || 'Failed to save call log. Please try again.');
+      return;
+    }
     setCallDialogOpen(false);
     setCallStatus('idle');
     setCallDuration(0);

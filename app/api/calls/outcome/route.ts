@@ -3,6 +3,18 @@ import { auth } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { z } from 'zod';
 import { format } from 'date-fns';
+import type { LeadStatus } from '@prisma/client';
+
+// no_answer has no equivalent LeadStatus — don't change status when agent couldn't reach the lead.
+const OUTCOME_TO_LEAD_STATUS: Partial<Record<string, LeadStatus>> = {
+  cold:           'cold',
+  warm:           'warm',
+  meeting_booked: 'meeting_booked',
+  not_interested: 'not_interested',
+  callback:       'callback',
+  do_not_call:    'do_not_call',
+  // no_answer → omitted intentionally: keeps current lead status unchanged
+};
 
 const schema = z.object({
   leadId: z.string().optional().nullable(),
@@ -44,10 +56,11 @@ export async function POST(req: NextRequest) {
   // Update lead (only when this call is tied to a saved lead)
   if (lead) {
     const updatedNotes = (lead.notes ? lead.notes + '\n' : '') + appendNote;
+    const newStatus = OUTCOME_TO_LEAD_STATUS[outcome]; // undefined for no_answer → field omitted
     await db.lead.update({
       where: { id: lead.id },
       data: {
-        status: outcome as 'new',
+        ...(newStatus ? { status: newStatus } : {}),
         notes: updatedNotes,
         callCount: { increment: 1 },
         lastCalledAt: now,
@@ -60,11 +73,17 @@ export async function POST(req: NextRequest) {
   // Update or create call log
   let log;
   if (callLogId) {
-    log = await db.callLog.update({
-      where: { id: callLogId },
-      data: { outcome, notes, durationSeconds, followUpCreated: followUp, followUpDate: followUpDate ? new Date(followUpDate) : null, followUpNotes: followUpNotes || null },
-    });
-  } else {
+    // Guard: the log might not exist if the call failed before SWML ran
+    const existing = await db.callLog.findUnique({ where: { id: callLogId } });
+    if (existing) {
+      log = await db.callLog.update({
+        where: { id: callLogId },
+        data: { outcome, notes, durationSeconds, followUpCreated: followUp, followUpDate: followUpDate ? new Date(followUpDate) : null, followUpNotes: followUpNotes || null },
+      });
+    }
+  }
+
+  if (!log) {
     const phoneNum = calledFromNumber ? await db.phoneNumber.findFirst({ where: { phoneNumber: calledFromNumber } }) : null;
     log = await db.callLog.create({
       data: {

@@ -65,9 +65,14 @@ export default function PostCallActions({ lead, callDuration, enabled, hasMoreNu
     if (outcome === 'do_not_call' && !dncConfirm) { setDncConfirm(true); return; }
     setSaving(true);
     localStorage.removeItem(draftKey);
-    if (next) await onSaveNext(buildPayload());
-    else await onSave(buildPayload());
-    setSaving(false);
+    try {
+      if (next) await onSaveNext(buildPayload());
+      else await onSave(buildPayload());
+    } catch (err) {
+      console.error('Save failed:', err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!enabled) {
